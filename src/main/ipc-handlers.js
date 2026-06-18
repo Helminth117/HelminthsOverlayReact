@@ -6,6 +6,22 @@ const store = require('./store');
 const { broadcast, getOverlayWin } = require('./windows');
 const { scanSteamGames } = require('./game-scanner');
 
+let cachedBlacklist = null;
+function getBlacklist() {
+  if (cachedBlacklist) return cachedBlacklist;
+  try {
+    const blPath = path.join(__dirname, 'blacklist.json');
+    if (fs.existsSync(blPath)) {
+      const blData = JSON.parse(fs.readFileSync(blPath, 'utf8'));
+      cachedBlacklist = Object.values(blData).filter(Array.isArray).flat();
+      return cachedBlacklist;
+    }
+  } catch (e) {
+    console.error("Error reading blacklist.json", e);
+  }
+  return [];
+}
+
 function getYtDlpPath() {
   // 1. Intentar buscar en la carpeta de recursos de la build en producción
   const prodPath = path.join(process.resourcesPath, 'yt-dlp.exe');
@@ -249,19 +265,8 @@ function registerIpcHandlers(tiktokService, gameDetector) {
 
       const ytSearch = require('yt-search');
       
-      // Blacklist definitions (Extracted from JSON)
-      const fs = require('fs');
-      const path = require('path');
-      let blacklist = [];
-      try {
-        const blPath = path.join(__dirname, 'blacklist.json');
-        if (fs.existsSync(blPath)) {
-          const blData = JSON.parse(fs.readFileSync(blPath, 'utf8'));
-          blacklist = Object.values(blData).filter(Array.isArray).flat();
-        }
-      } catch (e) {
-        console.error("Error reading blacklist.json", e);
-      }
+      // Blacklist definitions (Using module-level cache)
+      const blacklist = getBlacklist();
       
       // 1. Direct URL check (Keep using yt-search for direct links)
       const urlMatch = query.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
