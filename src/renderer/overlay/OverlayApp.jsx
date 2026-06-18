@@ -16,44 +16,8 @@ import UserProfile from './components/UserProfile';
 import StatsDisplay from './components/StatsDisplay';
 import LyricsDisplay from './components/LyricsDisplay';
 import TimerDisplay from './components/TimerDisplay';
-
-// ── CONFETTI ──
-let confetiFrame;
-function launchConfeti() {
-  const canvas = document.getElementById('confeti-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  const p = Array.from({ length: 80 }, () => ({
-    x: Math.random() * canvas.width,
-    y: canvas.height + Math.random() * 100,
-    r: Math.random() * 6 + 4,
-    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-    vx: Math.random() * 4 - 2,
-    vy: -Math.random() * 10 - 10,
-    gravity: 0.2
-  }));
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    p.forEach(q => {
-      q.x += q.vx;
-      q.y += q.vy;
-      q.vy += q.gravity;
-      ctx.fillStyle = q.color;
-      ctx.beginPath();
-      ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    if (p.some(q => q.y < canvas.height + 50)) {
-      confetiFrame = requestAnimationFrame(draw);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  }
-  if (confetiFrame) cancelAnimationFrame(confetiFrame);
-  draw();
-}
+import OverlayBackground from './components/OverlayBackground';
+import OverlayControls from './components/OverlayControls';
 
 export default function OverlayApp() {
   const { config, setConfig, setIsMoving, isMoving, setGameName, setTimer } = useOverlayStore();
@@ -194,103 +158,6 @@ export default function OverlayApp() {
       }, 500);
     };
 
-    let hideToolbarTimeout;
-    window.hideMiniToolbar = () => {
-      const tb = document.getElementById('edit-minitoolbar');
-      if (tb) tb.style.display = 'none';
-      window.activeWidgetForMenu = null;
-    };
-
-    window.resetToolbarTimeout = () => {
-      clearTimeout(hideToolbarTimeout);
-      hideToolbarTimeout = setTimeout(window.hideMiniToolbar, 3500);
-    };
-
-    window.showMiniToolbar = (el) => {
-      window.activeWidgetForMenu = el;
-      const tb = document.getElementById('edit-minitoolbar');
-      if (!tb) return;
-      tb.style.display = 'flex';
-      const rect = el.getBoundingClientRect();
-      tb.style.top = Math.max(0, rect.top - 40) + 'px';
-      tb.style.left = rect.left + 'px';
-      window.resetToolbarTimeout();
-    };
-
-    const tb = document.getElementById('edit-minitoolbar');
-    if (tb) {
-      tb.onmouseenter = () => clearTimeout(hideToolbarTimeout);
-      tb.onmouseleave = () => window.resetToolbarTimeout();
-    }
-
-    const btnFront = document.getElementById('btn-bring-front');
-    const btnBack = document.getElementById('btn-send-back');
-    const btnLock = document.getElementById('btn-lock-widget');
-    const btnHide = document.getElementById('btn-hide-widget');
-
-    if (btnFront) btnFront.onclick = (e) => {
-      e.stopPropagation();
-      const el = window.activeWidgetForMenu;
-      if (el) {
-        window.highestZ = (window.highestZ || 350) + 1;
-        el.style.zIndex = window.highestZ;
-        window.saveLayout();
-      }
-    };
-
-    if (btnBack) btnBack.onclick = (e) => {
-      e.stopPropagation();
-      const el = window.activeWidgetForMenu;
-      if (el) {
-        window.lowestZ = (window.lowestZ || 10) - 1;
-        el.style.zIndex = window.lowestZ;
-        window.saveLayout();
-      }
-    };
-
-    if (btnLock) btnLock.onclick = (e) => {
-      e.stopPropagation();
-      const el = window.activeWidgetForMenu;
-      if (el) {
-        const isLocked = el.classList.contains('locked-widget');
-        if (isLocked) {
-          el.classList.remove('locked-widget');
-          btnLock.textContent = '🔓';
-        } else {
-          el.classList.add('locked-widget');
-          btnLock.textContent = '🔒';
-        }
-      }
-    };
-
-    if (btnHide) btnHide.onclick = async (e) => {
-      e.stopPropagation();
-      const el = window.activeWidgetForMenu;
-      if (el) {
-        const id = el.id.replace('comp-', '');
-        if (window.api) {
-          const cfg = await window.api.getConfig();
-          if (cfg) {
-            if (!cfg.widgets) cfg.widgets = {};
-            cfg.widgets[id] = false;
-            await window.api.saveConfig({ widgets: cfg.widgets });
-            setConfig(cfg);
-          }
-        }
-        el.style.display = 'none';
-        const tb = document.getElementById('edit-minitoolbar');
-        if (tb) tb.style.display = 'none';
-        window.activeWidgetForMenu = null;
-      }
-    };
-
-    const handleDocumentMouseDown = (e) => {
-      if (!e.target.closest('.drag-item') && !e.target.closest('#edit-minitoolbar')) {
-        window.hideMiniToolbar();
-      }
-    };
-    document.addEventListener('mousedown', handleDocumentMouseDown);
-
     const handlers = {
       'config-updated': (cfg) => {
         if (cfg) setConfig(cfg);
@@ -300,21 +167,6 @@ export default function OverlayApp() {
       },
       'timer-tick': (data) => {
         if (data) setTimer(data);
-      },
-      'item-completed': (data) => {
-        if (!data) return;
-        const flash = document.getElementById('flash-overlay');
-        const flashText = document.getElementById('flash-text');
-        if (flash && flashText) {
-          if (data.itemName) {
-            flashText.textContent = '✓ ' + data.itemName.toUpperCase();
-          }
-          flash.classList.add('show');
-          launchConfeti();
-          setTimeout(() => {
-            flash.classList.remove('show');
-          }, 3000);
-        }
       }
     };
 
@@ -327,10 +179,7 @@ export default function OverlayApp() {
       Object.entries(registeredHandlers).forEach(([ch, handler]) => {
         if (handler) window.api.off(ch, handler);
       });
-      document.removeEventListener('mousedown', handleDocumentMouseDown);
-      clearTimeout(hideToolbarTimeout);
       clearTimeout(_saveLayoutTimeout);
-      if (confetiFrame) cancelAnimationFrame(confetiFrame);
     };
   }, []);
 
@@ -425,77 +274,7 @@ export default function OverlayApp() {
     }
   }, [config?.gameImage]);
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!document.body.classList.contains('edit-mode') || !window.activeWidgetForMenu) return;
-      if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-      
-      let dx = 0, dy = 0;
-      if (e.key === 'ArrowUp') dy = -1;
-      else if (e.key === 'ArrowDown') dy = 1;
-      else if (e.key === 'ArrowLeft') dx = -1;
-      else if (e.key === 'ArrowRight') dx = 1;
-      
-      if (dx !== 0 || dy !== 0) {
-        e.preventDefault();
-        const el = window.activeWidgetForMenu;
-        if (el.classList.contains('locked-widget')) return;
-        
-        let currentLeft = parseFloat(el.style.left) || 0;
-        let currentTop = parseFloat(el.style.top) || 0;
-        
-        let newLeft = currentLeft + dx;
-        let newTop = currentTop + dy;
 
-        newLeft = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, newLeft));
-        newTop = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, newTop));
-
-        el.style.left = newLeft + 'px';
-        el.style.top = newTop + 'px';
-
-        const rect = el.getBoundingClientRect();
-        const SNAP_DIST = 1;
-        let guideElX = document.getElementById('smart-guide-x');
-        let guideElY = document.getElementById('smart-guide-y');
-
-        let targetsX = [ { pos: 0, line: 0 }, { pos: window.innerWidth - rect.width, line: window.innerWidth - 1 }, { pos: window.innerWidth/2 - rect.width/2, line: window.innerWidth/2 } ];
-        let targetsY = [ { pos: 0, line: 0 }, { pos: window.innerHeight - rect.height, line: window.innerHeight - 1 }, { pos: window.innerHeight/2 - rect.height/2, line: window.innerHeight/2 } ];
-        
-        document.querySelectorAll('.drag-item').forEach(other => {
-          if (other === el || window.getComputedStyle(other).display === 'none') return;
-          const o = other.getBoundingClientRect();
-          targetsX.push({ pos: o.left, line: o.left }, { pos: o.right, line: o.right }, { pos: o.left - rect.width, line: o.left }, { pos: o.right - rect.width, line: o.right }, { pos: o.left + o.width/2 - rect.width/2, line: o.left + o.width/2 });
-          targetsY.push({ pos: o.top, line: o.top }, { pos: o.bottom, line: o.bottom }, { pos: o.top - rect.height, line: o.top }, { pos: o.bottom - rect.height, line: o.bottom }, { pos: o.top + o.height/2 - rect.height/2, line: o.top + o.height/2 });
-        });
-
-        let bestX = targetsX.find(t => Math.abs(t.pos - rect.left) <= SNAP_DIST);
-        if (bestX) { if (guideElX) { guideElX.style.left = bestX.line + 'px'; guideElX.style.display = 'block'; } }
-        else { if (guideElX) guideElX.style.display = 'none'; }
-        
-        let bestY = targetsY.find(t => Math.abs(t.pos - rect.top) <= SNAP_DIST);
-        if (bestY) { if (guideElY) { guideElY.style.top = bestY.line + 'px'; guideElY.style.display = 'block'; } }
-        else { if (guideElY) guideElY.style.display = 'none'; }
-
-        clearTimeout(window._hideGuidesTimeout);
-        window._hideGuidesTimeout = setTimeout(() => {
-          if (guideElX) guideElX.style.display = 'none';
-          if (guideElY) guideElY.style.display = 'none';
-        }, 1000);
-
-        const id = el.id;
-        window.api.getConfig().then(cfg => {
-          if (!cfg) return;
-          if (!cfg.layout) cfg.layout = { modules: {} };
-          if (!cfg.layout.modules) cfg.layout.modules = {};
-          cfg.layout.modules[id] = { ...cfg.layout.modules[id], t: el.style.top, l: el.style.left };
-          window.api.saveConfig();
-        });
-      }
-    };
-    
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Socials carousel
   useEffect(() => {
@@ -507,63 +286,7 @@ export default function OverlayApp() {
     }
   }, [config?.socialList]);
 
-  // Cinematic Border Dragging
-  useEffect(() => {
-    if (!isMoving) return;
-    
-    const setupBorder = (id, type) => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const bgT = document.getElementById('bg-top'), bgB = document.getElementById('bg-bottom');
-      const gbT = document.getElementById('game-bg-top'), gbB = document.getElementById('game-bg-bottom');
-      const gbM = document.getElementById('game-bg-middle');
-      
-      const onMouseDown = (e) => {
-        if (!document.body.classList.contains('edit-mode')) return;
-        e.preventDefault(); e.stopPropagation();
-        const move = ev => {
-          let v = type === 'top' ? ev.clientY : window.innerHeight - ev.clientY;
-          v = Math.max(20, Math.round(v / 1) * 1);
-          el.style[type] = v + 'px';
-          if (type === 'top') {
-            if (bgT) bgT.style.height = v + 'px'; 
-            if (gbT) gbT.style.height = v + 'px';
-            if (gbM) gbM.style.top = v + 'px';
-          } else {
-            if (bgB) bgB.style.height = v + 'px'; 
-            if (gbB) gbB.style.height = v + 'px';
-            if (gbM) gbM.style.bottom = v + 'px';
-          }
-          if (window.syncCorners) window.syncCorners();
-        };
-        const stop = () => {
-          document.removeEventListener('mousemove', move);
-          document.removeEventListener('mouseup', stop);
-          
-          window.api.getConfig().then(cfg => {
-            if (!cfg) return;
-            if (!cfg.layout) cfg.layout = { modules: {}, borders: {} };
-            if (!cfg.layout.borders) cfg.layout.borders = {};
-            cfg.layout.borders[type] = el.style[type];
-            window.api.saveConfig();
-          });
-        };
-        document.addEventListener('mousemove', move);
-        document.addEventListener('mouseup', stop);
-      };
-      
-      el.addEventListener('mousedown', onMouseDown);
-      return () => el.removeEventListener('mousedown', onMouseDown);
-    };
-    
-    const cleanTop = setupBorder('line-top', 'top');
-    const cleanBottom = setupBorder('line-bottom', 'bottom');
-    
-    return () => {
-      if (cleanTop) cleanTop();
-      if (cleanBottom) cleanBottom();
-    };
-  }, [isMoving]);
+
 
   const frameThickness = config?.frameThickness || 0;
 
@@ -573,28 +296,12 @@ export default function OverlayApp() {
         <div className="widget-content frame-content" style={{ borderWidth: `${frameThickness}px`, borderColor: 'var(--accent)' }}></div>
       </div>
 
-      <div id="game-bg-wrap">
-        <div id="game-bg-top">
-          <img className={`bg-img-layer ${!bgFading && bgImage ? 'loaded' : 'fade-out'}`} id="bg-img-top" src={bgImage || undefined} alt="" />
-          <div className="bg-vignette"></div>
-          {config?.showSceneBg && <div id="mesh-gradient-bg-top" style={{ position: 'absolute', inset: '-20%', background: 'linear-gradient(45deg, rgba(10,10,15,1), rgba(var(--accent-rgb),0.2), rgba(10,10,15,1))', backgroundSize: '400% 400%', animation: 'meshGradient 15s ease infinite', zIndex: -2 }}></div>}
-        </div>
-        <div id="game-bg-middle"></div>
-        <div id="game-bg-bottom">
-          <img className={`bg-img-layer ${!bgFading && bgImage ? 'loaded' : 'fade-out'}`} id="bg-img-bottom" src={bgImage || undefined} alt="" />
-          <div className="bg-vignette"></div>
-          {config?.showSceneBg && <div id="mesh-gradient-bg-bottom" style={{ position: 'absolute', inset: '-20%', background: 'linear-gradient(45deg, rgba(10,10,15,1), rgba(var(--accent-rgb),0.2), rgba(10,10,15,1))', backgroundSize: '400% 400%', animation: 'meshGradient 15s ease infinite', zIndex: -2 }}></div>}
-        </div>
-      </div>
-
-      <div id="bg-top" className="bg-panel"></div>
-      <div id="bg-bottom" className="bg-panel"></div>
-      <div className="border-line" id="line-top"></div>
-      <div className="border-line" id="line-bottom"></div>
-      <div className="border-corner" id="corner-tl"></div>
-      <div className="border-corner" id="corner-tr"></div>
-      <div className="border-corner" id="corner-bl"></div>
-      <div className="border-corner" id="corner-br"></div>
+      <OverlayBackground
+        isMoving={isMoving}
+        config={config}
+        bgImage={bgImage}
+        bgFading={bgFading}
+      />
 
       <div id="ambilight-frame" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, pointerEvents: 'none', boxSizing: 'border-box', opacity: 0, transition: 'opacity 0.3s ease, box-shadow 0.3s ease', border: '4px solid transparent' }}></div>
 
@@ -675,23 +382,10 @@ export default function OverlayApp() {
       
       <SceneManager />
       
-      <canvas id="confeti-canvas"></canvas>
-
-      {/* React handles alerts now */}
-      <div className="flash-overlay" id="flash-overlay"><div className="flash-text" id="flash-text">✓ COMPLETADO</div></div>
-      <div className="toast" id="toast">Notificación</div>
-
-      {/* Edit Mode Mini Toolbar */}
-      <div id="edit-minitoolbar" className="glass" style={{ display: 'none', position: 'absolute', zIndex: 10001, flexDirection: 'row', gap: '5px', padding: '5px', borderRadius: '6px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }}>
-        <button id="btn-bring-front" className="btn" title="Traer al Frente" style={{ padding: '4px 8px', fontSize: '14px', background: 'transparent' }}>⬆️</button>
-        <button id="btn-send-back" className="btn" title="Enviar al Fondo" style={{ padding: '4px 8px', fontSize: '14px', background: 'transparent' }}>⬇️</button>
-        <button id="btn-lock-widget" className="btn" title="Bloquear Movimiento" style={{ padding: '4px 8px', fontSize: '14px', background: 'transparent' }}>🔓</button>
-        <button id="btn-hide-widget" className="btn" title="Ocultar Widget" style={{ padding: '4px 8px', fontSize: '14px', background: 'transparent' }}>👁️</button>
-      </div>
-
-      {/* Smart Guides */}
-      <div id="smart-guide-x" style={{ display: 'none', position: 'fixed', top: 0, bottom: 0, width: '1px', background: '#ffba50', zIndex: 9999, pointerEvents: 'none', boxShadow: '0 0 6px #ffba50' }}></div>
-      <div id="smart-guide-y" style={{ display: 'none', position: 'fixed', left: 0, right: 0, height: '1px', background: '#ffba50', zIndex: 9999, pointerEvents: 'none', boxShadow: '0 0 6px #ffba50' }}></div>
+      <OverlayControls
+        isMoving={isMoving}
+        setConfig={setConfig}
+      />
     </>
   );
 }
