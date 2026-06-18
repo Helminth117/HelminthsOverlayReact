@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #1d9e75;
+  --color-accent-hover: #14805e;
+  --color-bg-dark: #0a0a0d;
+  --color-bg-panel: rgba(15, 15, 20, 0.95);
+  --color-border-glow: rgba(29, 158, 117, 0.3);
+}
+
+body {
+  font-family: 'Inter', 'Outfit', sans-serif;
+  color: white;
+  background-color: transparent;
+}

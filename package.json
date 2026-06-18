@@ -1,0 +1,72 @@
+{
+  "name": "streamoverlayapp-react",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && electron-builder",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "express": "^5.2.1",
+    "jsdom": "^29.1.1",
+    "lucide-react": "^1.20.0",
+    "play-dl": "^1.9.7",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.0",
+    "socket.io": "^4.8.3",
+    "tiktok-live-connector": "^2.1.1-beta1",
+    "yt-search": "^2.13.1",
+    "ytmusic-api": "^5.3.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "autoprefixer": "^10.5.0",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.1",
+    "vite": "^8.0.16",
+    "vite-plugin-electron": "^1.0.4",
+    "vite-plugin-electron-renderer": "^1.0.0"
+  },
+  "build": {
+    "appId": "com.helminth.streamoverlayreact",
+    "productName": "StreamOverlay React",
+    "copyright": "Helminth",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist",
+      "dist-electron"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StreamOverlay React"
+    }
+  }
+}
