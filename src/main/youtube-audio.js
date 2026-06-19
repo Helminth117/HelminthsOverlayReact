@@ -3,9 +3,11 @@ const path = require('path');
 const fs = require('fs');
 
 let YT_DLP_PATH = 'yt-dlp';
-const devFallback = 'C:\\Users\\Helminth\\AppData\\Local\\Python\\pythoncore-3.14-64\\Scripts\\yt-dlp.exe';
-if (fs.existsSync(devFallback)) {
-  YT_DLP_PATH = devFallback;
+if (process.platform === 'win32' && process.env.USERPROFILE) {
+  const devFallback = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Python', 'pythoncore-3.14-64', 'Scripts', 'yt-dlp.exe');
+  if (fs.existsSync(devFallback)) {
+    YT_DLP_PATH = devFallback;
+  }
 }
 
 function getAudioStreamUrl(videoId) {

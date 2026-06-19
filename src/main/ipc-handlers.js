@@ -31,9 +31,11 @@ function getYtDlpPath() {
   const localBinPath = path.join(app.getAppPath(), 'bin', 'yt-dlp.exe');
   if (fs.existsSync(localBinPath)) return localBinPath;
 
-  // 3. Fallback de desarrollo para tu máquina específica
-  const hardcodedFallback = 'C:\\Users\\Helminth\\AppData\\Local\\Python\\pythoncore-3.14-64\\Scripts\\yt-dlp.exe';
-  if (fs.existsSync(hardcodedFallback)) return hardcodedFallback;
+  // 3. Fallback de desarrollo dinámico
+  if (process.platform === 'win32' && process.env.USERPROFILE) {
+    const devFallback = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Python', 'pythoncore-3.14-64', 'Scripts', 'yt-dlp.exe');
+    if (fs.existsSync(devFallback)) return devFallback;
+  }
 
   // 4. Intentar usar la PATH de Windows
   return 'yt-dlp';
@@ -219,13 +221,26 @@ function registerIpcHandlers(tiktokService, gameDetector) {
       filters: [ { name: 'Imágenes', extensions: ['jpg', 'png', 'jpeg', 'webp', 'gif'] } ],
       properties: ['openFile']
     });
-    if (res && res.length > 0) return 'local-file://' + res[0].replace(/\\\\/g, '/');
+    if (res && res.length > 0) {
+      const filePath = res[0];
+      store.addTempAllowedPath(filePath);
+      return 'local-file://' + filePath.replace(/\\\\/g, '/');
+    }
     return null;
   });
 
   ipcMain.on('preview-alert', (_e, data) => {
     if (data && data.type === 'combo') {
-      broadcast('tiktok-like', { user: 'Tester', count: data.count || 1 });
+      const amt = data.count || 1;
+      tiktokService.stats.likes += amt;
+      const user = 'Tester';
+      tiktokService.userLikes[user] = (tiktokService.userLikes[user] || 0) + amt;
+      if (tiktokService.userLikes[user] > tiktokService.stats.topLikerCount) {
+        tiktokService.stats.topLiker = user;
+        tiktokService.stats.topLikerCount = tiktokService.userLikes[user];
+      }
+      broadcast('tiktok-stats', tiktokService.stats);
+      broadcast('tiktok-like', { user, count: amt });
     } else {
       broadcast('stream-alert', data);
     }
@@ -242,125 +257,7 @@ function registerIpcHandlers(tiktokService, gameDetector) {
 
   ipcMain.on('queue-updated', (_e, queue) => broadcast('queue-updated', queue));
 
-  ipcMain.handle('search-youtube', async (_e, payload) => {
-    try {
-      let query = '';
-      let maxDuration = 25 * 60; // 25 minutes default
-      let targetDuration = null;
-
-      if (typeof payload === 'string') {
-        query = payload;
-      } else if (payload && typeof payload === 'object') {
-        query = payload.query || '';
-        if (payload.opts && typeof payload.opts.maxDuration === 'number') {
-          maxDuration = payload.opts.maxDuration * 60;
-        }
-        if (payload.opts && typeof payload.opts.targetDuration === 'number') {
-          targetDuration = payload.opts.targetDuration;
-        }
-      }
-
-      if (!query || typeof query !== 'string') return null;
-      query = query.substring(0, 200).trim();
-
-      const ytSearch = require('yt-search');
-      
-      // Blacklist definitions (Using module-level cache)
-      const blacklist = getBlacklist();
-      
-      // 1. Direct URL check (Keep using yt-search for direct links)
-      const urlMatch = query.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-      if (urlMatch) {
-         const videoId = urlMatch[1];
-         const v = await ytSearch({ videoId: videoId });
-         if (v) {
-            if (v.seconds > maxDuration) return null;
-            const titleLower = v.title.toLowerCase();
-            const authorLower = v.author.name.toLowerCase();
-            if (blacklist.some(bw => titleLower.includes(bw) || authorLower.includes(bw))) return null;
-            return { videoId: v.videoId, title: v.title, author: v.author.name, duration: v.timestamp, seconds: v.seconds };
-         }
-      }
-
-      // 2. YouTube Music API Search
-      if (!ytmusicInstance) {
-        const YTMusic = require('ytmusic-api');
-        ytmusicInstance = new YTMusic();
-        await ytmusicInstance.initialize();
-      }
-
-      const r = await ytmusicInstance.searchSongs(query);
-
-      if (r && r.length > 0) {
-        let bestVideo = null;
-        let bestDiff = Infinity;
-        
-        const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const blacklistRegexes = blacklist.map(bw => new RegExp(`(?:^|\\W)${escapeRegExp(bw)}(?:\\W|$)`, 'i'));
-
-        for (let i = 0; i < Math.min(r.length, 10); i++) {
-           const v = r[i];
-           const titleLower = v.name.toLowerCase();
-           const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
-           
-           // Check blacklist con regex para evitar falsos positivos
-           if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
-           
-           // Check duration limit (v.duration is in seconds)
-           if (v.duration > maxDuration) continue;
-           
-           // Check for hidden loops
-           if (v.duration > 600 && (titleLower.includes('1 hour') || titleLower.includes('10 hour') || titleLower.includes('loop'))) {
-              continue;
-           }
-
-           if (targetDuration) {
-             const diff = Math.abs(v.duration - targetDuration);
-             if (diff < bestDiff) {
-               bestDiff = diff;
-               bestVideo = v;
-             }
-           } else {
-             bestVideo = v;
-             break;
-           }
-        }
-        
-        // Si usamos targetDuration y la mejor diferencia es demasiado alta (ej: mayor a 12 segundos),
-        // relajamos el filtro de duración y tomamos la primera coincidencia válida.
-        if (targetDuration && bestDiff > 12) {
-          for (let i = 0; i < Math.min(r.length, 10); i++) {
-             const v = r[i];
-             const titleLower = v.name.toLowerCase();
-             const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
-             if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
-             if (v.duration > maxDuration) continue;
-             if (v.duration > 600 && (titleLower.includes('1 hour') || titleLower.includes('10 hour') || titleLower.includes('loop'))) continue;
-             bestVideo = v;
-             break;
-          }
-        }
-        
-        if (bestVideo) {
-          const v = bestVideo;
-          const m = Math.floor(v.duration / 60);
-          const s = (v.duration % 60).toString().padStart(2, '0');
-          const timestamp = `${m}:${s}`;
-          return {
-            videoId: v.videoId,
-            title: v.name,
-            author: v.artist ? v.artist.name : 'Unknown',
-            duration: timestamp,
-            seconds: v.duration
-          };
-        }
-      }
-      return null;
-    } catch (err) {
-      console.error('yt-search error:', err);
-      return null;
-    }
-  });
+  ipcMain.handle('search-youtube', async (_e, payload) => await searchYoutubeHelper(payload));
 
   ipcMain.handle('get-audio-stream-url', async (_e, videoId) => {
     try {
@@ -458,6 +355,126 @@ function registerIpcHandlers(tiktokService, gameDetector) {
   });
 }
 
+async function searchYoutubeHelper(payload) {
+  try {
+    let query = '';
+    let maxDuration = 25 * 60; // 25 minutes default
+    let targetDuration = null;
+
+    if (typeof payload === 'string') {
+      query = payload;
+    } else if (payload && typeof payload === 'object') {
+      query = payload.query || '';
+      if (payload.opts && typeof payload.opts.maxDuration === 'number') {
+        maxDuration = payload.opts.maxDuration * 60;
+      }
+      if (payload.opts && typeof payload.opts.targetDuration === 'number') {
+        targetDuration = payload.opts.targetDuration;
+      }
+    }
+
+    if (!query || typeof query !== 'string') return null;
+    query = query.substring(0, 200).trim();
+
+    const ytSearch = require('yt-search');
+    
+    // Blacklist definitions (Using module-level cache)
+    const blacklist = getBlacklist();
+    
+    // 1. Direct URL check (Keep using yt-search for direct links)
+    const urlMatch = query.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    if (urlMatch) {
+       const videoId = urlMatch[1];
+       const v = await ytSearch({ videoId: videoId });
+       if (v) {
+          if (v.seconds > maxDuration) return null;
+          const titleLower = v.title.toLowerCase();
+          const authorLower = v.author.name.toLowerCase();
+          if (blacklist.some(bw => titleLower.includes(bw) || authorLower.includes(bw))) return null;
+          return { videoId: v.videoId, title: v.title, author: v.author.name, duration: v.timestamp, seconds: v.seconds };
+       }
+    }
+
+    // 2. YouTube Music API Search
+    if (!ytmusicInstance) {
+      const YTMusic = require('ytmusic-api');
+      ytmusicInstance = new YTMusic();
+      await ytmusicInstance.initialize();
+    }
+
+    const r = await ytmusicInstance.searchSongs(query);
+
+    if (r && r.length > 0) {
+      let bestVideo = null;
+      let bestDiff = Infinity;
+      
+      const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const blacklistRegexes = blacklist.map(bw => new RegExp(`(?:^|\\W)${escapeRegExp(bw)}(?:\\W|$)`, 'i'));
+
+      for (let i = 0; i < Math.min(r.length, 10); i++) {
+         const v = r[i];
+         const titleLower = v.name.toLowerCase();
+         const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
+         
+         // Check blacklist con regex para evitar falsos positivos
+         if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
+         
+         // Check duration limit (v.duration is in seconds)
+         if (v.duration > maxDuration) continue;
+         
+         // Check for hidden loops
+         if (v.duration > 600 && (titleLower.includes('1 hour') || titleLower.includes('10 hour') || titleLower.includes('loop'))) {
+            continue;
+         }
+
+         if (targetDuration) {
+           const diff = Math.abs(v.duration - targetDuration);
+           if (diff < bestDiff) {
+             bestDiff = diff;
+             bestVideo = v;
+           }
+         } else {
+           bestVideo = v;
+           break;
+         }
+      }
+      
+      // Si usamos targetDuration y la mejor diferencia es demasiado alta (ej: mayor a 12 segundos),
+      // relajamos el filtro de duración y tomamos la primera coincidencia válida.
+      if (targetDuration && bestDiff > 12) {
+        for (let i = 0; i < Math.min(r.length, 10); i++) {
+           const v = r[i];
+           const titleLower = v.name.toLowerCase();
+           const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
+           if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
+           if (v.duration > maxDuration) continue;
+           if (v.duration > 600 && (titleLower.includes('1 hour') || titleLower.includes('10 hour') || titleLower.includes('loop'))) continue;
+           bestVideo = v;
+           break;
+        }
+      }
+      
+      if (bestVideo) {
+        const v = bestVideo;
+        const m = Math.floor(v.duration / 60);
+        const s = (v.duration % 60).toString().padStart(2, '0');
+        const timestamp = `${m}:${s}`;
+        return {
+          videoId: v.videoId,
+          title: v.name,
+          author: v.artist ? v.artist.name : 'Unknown',
+          duration: timestamp,
+          seconds: v.duration
+        };
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('searchYoutubeHelper error:', err);
+    return null;
+  }
+}
+
 function createRpcHandler(tiktokService, gameDetector) {
   const { readJSON, getConfig, updateConfig } = store;
   const actions = createSharedActions(tiktokService, gameDetector);
@@ -492,8 +509,20 @@ function createRpcHandler(tiktokService, gameDetector) {
         case 'emitItemCompleted': { broadcast('item-completed', args[0]); return true; }
         case 'setMoveMode': { broadcast('move-mode', args[0]); return true; }
         case 'previewAlert': {
-          if (args[0] && args[0].type === 'combo') broadcast('tiktok-like', { user: 'Tester', count: args[0].count || 1 });
-          else broadcast('stream-alert', args[0]);
+          if (args[0] && args[0].type === 'combo') {
+            const amt = args[0].count || 1;
+            tiktokService.stats.likes += amt;
+            const user = 'Tester';
+            tiktokService.userLikes[user] = (tiktokService.userLikes[user] || 0) + amt;
+            if (tiktokService.userLikes[user] > tiktokService.stats.topLikerCount) {
+              tiktokService.stats.topLiker = user;
+              tiktokService.stats.topLikerCount = tiktokService.userLikes[user];
+            }
+            broadcast('tiktok-stats', tiktokService.stats);
+            broadcast('tiktok-like', { user, count: amt });
+          } else {
+            broadcast('stream-alert', args[0]);
+          }
           return true;
         }
         case 'testChatTts': {
@@ -519,6 +548,8 @@ function createRpcHandler(tiktokService, gameDetector) {
         case 'ytStop': { broadcast('yt-stop'); return true; }
         case 'ytSkip': { broadcast('yt-skip'); return true; }
         case 'ytSetVolume': { broadcast('yt-set-volume', args[0]); return true; }
+        case 'searchYoutube': return await searchYoutubeHelper(args[0]);
+        case 'sendQueueUpdate': { broadcast('queue-updated', args[0]); return true; }
         default: return null;
       }
     } catch (e) { console.error('RPC Error:', e); throw e; }

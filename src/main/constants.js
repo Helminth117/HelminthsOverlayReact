@@ -57,6 +57,8 @@ const DEFAULT_CONFIG = {
   autoDetectGame: true,
   widgets: { user: true, socials: true, stats: true, objs: true, timers: true, game: true, chips: true },
   layout: {},
+  alertTop: 40,
+  alertDuration: 4000,
 };
 
 module.exports = {

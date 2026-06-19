@@ -30,6 +30,28 @@ function formatTime(s) {
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
 }
 
+const copyToClipboard = async (text) => {
+  try {
+    if (window.api && typeof window.api.writeClipboard === 'function') {
+      window.api.writeClipboard(text);
+      return true;
+    }
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    console.warn("Fallback to execCommand copy due to error:", e);
+  }
+  const input = document.createElement('textarea');
+  input.value = text;
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand('copy');
+  document.body.removeChild(input);
+  return true;
+};
+
 export default function ControlApp() {
   const [activeTab, setActiveTab] = useState('overlay');
   const [activeSubTab, setActiveSubTab] = useState('general');
@@ -56,6 +78,8 @@ export default function ControlApp() {
   const [qrModal, setQrModal] = useState({ open: false, url: '' });
   const [audioDevices, setAudioDevices] = useState([]);
   const [ttStatus, setTtStatus] = useState({ state: 'disconnected', msg: 'Desconectado', username: '', stats: null });
+  const [tunnelUrl, setTunnelUrl] = useState('');
+  const [tunnelStatus, setTunnelStatus] = useState('connecting'); // 'connecting' | 'online' | 'error'
   
   // Timer State
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -180,6 +204,21 @@ export default function ControlApp() {
 
     refreshAudioDevices();
     
+    // Fetch initial tunnel info
+    try {
+      const info = await window.api.getRemoteInfo();
+      if (info) {
+        if (info.tunnelUrl) {
+          setTunnelUrl(info.tunnelUrl);
+          setTunnelStatus('online');
+        } else {
+          setTunnelStatus('connecting');
+        }
+      }
+    } catch (e) {
+      console.error("Error al obtener info remota inicial:", e);
+    }
+    
     if (cfg.theme) {
       document.body.className = Array.from(document.body.classList).filter(c => !c.startsWith('theme-')).join(' ');
       document.body.classList.add(cfg.theme);
@@ -256,6 +295,17 @@ export default function ControlApp() {
         }
         return { ...prev, social: soc };
       });
+    });
+
+    addListener('tunnel-status', (data) => {
+      if (data) {
+        setTunnelStatus(data.status);
+        if (data.status === 'online' && data.url) {
+          setTunnelUrl(data.url);
+        } else if (data.status === 'error') {
+          setTunnelUrl('');
+        }
+      }
     });
 
     return () => {
@@ -371,138 +421,213 @@ export default function ControlApp() {
   };
 
   // Rendering helpers
-  const WIDGET_LABELS = { frame: 'Marco Live', user: 'Nombre/Live', socials: 'Redes', stats: 'Stats TikTok', topevents: 'Top Eventos', objs: 'Objetivos', timers: 'Reloj', game: 'Juego', chips: 'Datos Juego', chat: 'Caja Chat', 'pinned-chat': 'Mensaje Fijado', visualizer: 'Visualizador', spotify: 'Spotify / Web', media: 'Música Local', lyrics: 'Letras' };
+  const WIDGET_LABELS = { frame: 'Marco Live', user: 'Nombre/Live', socials: 'Redes', stats: 'Stats TikTok', topevents: 'Top Eventos', objs: 'Objetivos', timers: 'Reloj', game: 'Juego', chips: 'Datos Juego', chat: 'Caja Chat', 'pinned-chat': 'Mensaje Fijado', visualizer: 'Visualizador', spotify: 'Spotify / Web', media: 'Música Local', lyrics: 'Letras', 'chat-avatars': 'Avatares Chat', combo: 'Combos de Likes' };
 
   return (
-    <>
-      {/* Header */}
-      <header className="flex items-center justify-between mb-md">
-        <h1 style={{ marginBottom: 0 }}>
-          <div className={`status-dot ${ttStatus.state === 'connected' ? 'live' : (ttStatus.state === 'waiting' ? 'online' : '')}`} id="conn-dot"></div>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 8, marginRight: 8 }}>
+    <div className="app-container">
+      {/* Sidebar Navigation */}
+      <aside className="sidebar">
+        <div className="brand-section">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
             <line x1="8" y1="21" x2="16" y2="21"></line>
             <line x1="12" y1="17" x2="12" y2="21"></line>
           </svg>
-          Helminth's Overlay
-        </h1>
-        <div className="flex items-center gap-sm">
-          <span className={`save-ind ${saveInd ? 'show' : ''}`} id="save-ind">Guardado</span>
-          <button className="btn btn-ghost text-xs" onClick={async () => {
-            const info = await window.api.getRemoteInfo();
-            if (info && info.qrcodeDataUrl) setQrModal({ open: true, url: info.qrcodeDataUrl });
-            else alert("Servidor remoto cargando o no disponible en modo móvil.");
-          }}>📱 Remote</button>
+          <span className="brand-title">STREAM OVERLAY</span>
         </div>
-      </header>
-
-      <div className="move-alert">⚠ MODO MOVIMIENTO ACTIVO</div>
-
-      {qrModal.open && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card flex-col items-center" style={{ maxWidth: 300, textAlign: 'center' }}>
-            <h3 className="mb-sm">Control Remoto</h3>
-            <img src={qrModal.url} style={{ width: 200, height: 200, borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)' }} alt="QR" />
-            <p className="text-xs text-secondary mb-md">Escanea para controlar desde tu celular. Asegúrate de estar en el mismo WiFi.</p>
-            <button className="btn btn-ghost w-full" onClick={() => setQrModal({ open: false, url: '' })}>Cerrar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Tabs */}
-      <nav className="tabs">
-        <button className={`tab-btn ${activeTab === 'overlay' ? 'active' : ''}`} onClick={() => setActiveTab('overlay')}>Overlay</button>
-        <button className={`tab-btn ${activeTab === 'objetivos' ? 'active' : ''}`} onClick={() => setActiveTab('objetivos')}>Objetivos</button>
-        <button className={`tab-btn ${activeTab === 'historial' ? 'active' : ''}`} onClick={() => setActiveTab('historial')}>Historial</button>
-        <button className={`tab-btn ${activeTab === 'tiktok' ? 'active' : ''}`} onClick={() => setActiveTab('tiktok')}>TikTok</button>
-      </nav>
-
-      {/* OVERLAY TAB */}
-      <main className={`tab-view ${activeTab === 'overlay' ? 'active' : ''}`}>
-        <nav className="sub-tabs">
-          <button className={`sub-tab-btn ${activeSubTab === 'general' ? 'active' : ''}`} onClick={() => setActiveSubTab('general')}>General</button>
-          <button className={`sub-tab-btn ${activeSubTab === 'apariencia' ? 'active' : ''}`} onClick={() => setActiveSubTab('apariencia')}>Apariencia</button>
-          <button className={`sub-tab-btn ${activeSubTab === 'juegos' ? 'active' : ''}`} onClick={() => setActiveSubTab('juegos')}>Videojuegos</button>
-          <button className={`sub-tab-btn ${activeSubTab === 'alertas' ? 'active' : ''}`} onClick={() => setActiveSubTab('alertas')}>Alertas & Reloj</button>
+        
+        <nav className="sidebar-nav">
+          <button className={`sidebar-btn ${activeTab === 'overlay' ? 'active' : ''}`} onClick={() => setActiveTab('overlay')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+              <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+              <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+            </svg>
+            Overlay
+          </button>
+          <button className={`sidebar-btn ${activeTab === 'objetivos' ? 'active' : ''}`} onClick={() => setActiveTab('objetivos')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="6"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+            </svg>
+            Objetivos
+          </button>
+          <button className={`sidebar-btn ${activeTab === 'historial' ? 'active' : ''}`} onClick={() => setActiveTab('historial')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Historial
+          </button>
+          <button className={`sidebar-btn ${activeTab === 'tiktok' ? 'active' : ''}`} onClick={() => setActiveTab('tiktok')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
+            </svg>
+            TikTok Live
+          </button>
         </nav>
+      </aside>
 
-        <GeneralSettingsManager
-          activeSubTab={activeSubTab}
-          config={config}
-          saveConfig={saveConfig}
-          WIDGET_LABELS={WIDGET_LABELS}
+      {/* Main Content Pane */}
+      <div className="content-area">
+        {/* Header */}
+        <header className="flex items-center justify-between mb-md">
+          <h1 style={{ marginBottom: 0 }}>
+            <div className={`status-dot ${ttStatus.state === 'connected' ? 'live' : (ttStatus.state === 'waiting' ? 'online' : '')}`} id="conn-dot"></div>
+            <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.3px', background: 'none', WebkitTextFillColor: 'var(--text-primary)' }}>
+              {ttStatus.state === 'connected' ? `LIVE: @${ttStatus.username}` : (ttStatus.state === 'waiting' ? `ESPERANDO LIVE: @${ttStatus.username}` : 'MODO SIN CONEXIÓN')}
+            </span>
+          </h1>
+          <div className="flex items-center gap-sm">
+            <span className={`save-ind ${saveInd ? 'show' : ''}`} id="save-ind">Guardado</span>
+            
+            {tunnelStatus === 'connecting' && <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginRight: '4px' }}>⏳ Creando enlace seguro...</span>}
+            {tunnelStatus === 'online' && <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✓ Enlace Seguro Listo</span>}
+            {tunnelStatus === 'error' && <span style={{ fontSize: '11px', color: '#f59e0b', marginRight: '4px' }}>⚠ Enlace Local (Sin Internet)</span>}
+
+            <button className="btn btn-ghost text-xs" onClick={async () => {
+              try {
+                const info = await window.api.getRemoteInfo();
+                if (info) {
+                  let overlayUrl = '';
+                  const activeUrl = info.tunnelUrl || tunnelUrl;
+                  if (activeUrl) {
+                    overlayUrl = `${activeUrl}/overlay.html?token=${info.token || ''}`;
+                  } else if (info.url) {
+                    const urlObj = new URL(info.url);
+                    const hostname = urlObj.hostname;
+                    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                      urlObj.hostname = '127.0.0.1.nip.io';
+                    } else if (/^[0-9.]+$/.test(hostname)) {
+                      urlObj.hostname = `${hostname}.nip.io`;
+                    }
+                    overlayUrl = urlObj.toString().replace('/control.html', '/overlay.html');
+                  }
+                  
+                  if (overlayUrl) {
+                    await copyToClipboard(overlayUrl);
+                    alert("¡Enlace del overlay copiado al portapapeles! Agrégalo en TikTok Studio como fuente de Enlace.");
+                  } else {
+                    alert("No se pudo obtener el enlace del overlay.");
+                  }
+                } else {
+                  alert("No se pudo obtener el enlace del overlay.");
+                }
+              } catch (e) {
+                console.error(e);
+                alert("Error al copiar el enlace.");
+              }
+            }}>🔗 Copiar URL OBS/TikTok</button>
+            <button className="btn btn-ghost text-xs" onClick={async () => {
+              const info = await window.api.getRemoteInfo();
+              if (info && info.qrcodeDataUrl) setQrModal({ open: true, url: info.qrcodeDataUrl });
+              else alert("Servidor remoto cargando o no disponible en modo móvil.");
+            }}>📱 Remote</button>
+          </div>
+        </header>
+
+        <div className="move-alert">⚠ MODO MOVIMIENTO ACTIVO</div>
+
+        {qrModal.open && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="card flex-col items-center" style={{ maxWidth: 300, textAlign: 'center' }}>
+              <h3 className="mb-sm">Control Remoto</h3>
+              <img src={qrModal.url} style={{ width: 200, height: 200, borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)' }} alt="QR" />
+              <p className="text-xs text-secondary mb-md">Escanea para controlar desde tu celular. Asegúrate de estar en el mismo WiFi.</p>
+              <button className="btn btn-ghost w-full" onClick={() => setQrModal({ open: false, url: '' })}>Cerrar</button>
+            </div>
+          </div>
+        )}
+
+        {/* OVERLAY TAB */}
+        <main className={`tab-view ${activeTab === 'overlay' ? 'active' : ''}`}>
+          <nav className="sub-tabs">
+            <button className={`sub-tab-btn ${activeSubTab === 'general' ? 'active' : ''}`} onClick={() => setActiveSubTab('general')}>General</button>
+            <button className={`sub-tab-btn ${activeSubTab === 'apariencia' ? 'active' : ''}`} onClick={() => setActiveSubTab('apariencia')}>Apariencia</button>
+            <button className={`sub-tab-btn ${activeSubTab === 'juegos' ? 'active' : ''}`} onClick={() => setActiveSubTab('juegos')}>Videojuegos</button>
+            <button className={`sub-tab-btn ${activeSubTab === 'alertas' ? 'active' : ''}`} onClick={() => setActiveSubTab('alertas')}>Alertas & Reloj</button>
+          </nav>
+
+          <GeneralSettingsManager
+            activeSubTab={activeSubTab}
+            config={config}
+            saveConfig={saveConfig}
+            WIDGET_LABELS={WIDGET_LABELS}
+          />
+
+          <AppearanceSettingsManager
+            activeSubTab={activeSubTab}
+            config={config}
+            saveConfig={saveConfig}
+            audioDevices={audioDevices}
+            refreshAudioDevices={refreshAudioDevices}
+          />
+
+          <GameProfilesCard
+            activeSubTab={activeSubTab}
+            gameProfiles={gameProfiles}
+            saveGameProfilesDebounced={saveGameProfilesDebounced}
+            config={config}
+            saveConfig={saveConfig}
+            showSaved={showSaved}
+          />
+
+          <AlertsTimerManager
+            activeSubTab={activeSubTab}
+            config={config}
+            saveConfig={saveConfig}
+            timerSeconds={timerSeconds}
+            timerMode={timerMode}
+            timerRunning={timerRunning}
+            timerDoneMsg={timerDoneMsg}
+            countdownInput={countdownInput}
+            setCountdownInput={setCountdownInput}
+            timerToggle={timerToggle}
+            timerSwitchMode={timerSwitchMode}
+            timerReset={timerReset}
+            applyCountdown={applyCountdown}
+          />
+        </main>
+
+        {/* OBJETIVOS TAB */}
+        <ObjectivesManager
+          activeTab={activeTab}
+          session={session}
+          setSession={setSession}
+          notes={notes}
+          setNotes={setNotes}
+          plantillas={plantillas}
+          setPlantillas={setPlantillas}
         />
 
-        <AppearanceSettingsManager
-          activeSubTab={activeSubTab}
-          config={config}
-          saveConfig={saveConfig}
-          audioDevices={audioDevices}
-          refreshAudioDevices={refreshAudioDevices}
-        />
-
-        <GameProfilesCard
-          activeSubTab={activeSubTab}
-          gameProfiles={gameProfiles}
-          saveGameProfilesDebounced={saveGameProfilesDebounced}
-          config={config}
-          saveConfig={saveConfig}
+        {/* HISTORIAL TAB */}
+        <HistoryManager
+          activeTab={activeTab}
+          historial={historial}
+          setHistorial={setHistorial}
+          setSession={setSession}
+          setActiveTab={setActiveTab}
           showSaved={showSaved}
         />
 
-        <AlertsTimerManager
-          activeSubTab={activeSubTab}
+        {/* TIKTOK TAB */}
+        <TikTokManager
+          activeTab={activeTab}
+          ttStatus={ttStatus}
+          setTtStatus={setTtStatus}
           config={config}
           saveConfig={saveConfig}
-          timerSeconds={timerSeconds}
-          timerMode={timerMode}
-          timerRunning={timerRunning}
-          timerDoneMsg={timerDoneMsg}
-          countdownInput={countdownInput}
-          setCountdownInput={setCountdownInput}
-          timerToggle={timerToggle}
-          timerSwitchMode={timerSwitchMode}
-          timerReset={timerReset}
-          applyCountdown={applyCountdown}
+          showSaved={showSaved}
+          poll={poll}
+          setPoll={setPoll}
+          isPollActive={isPollActive}
+          setIsPollActive={setIsPollActive}
+          chatHistory={chatHistory}
+          queueData={queueData}
         />
-      </main>
-
-      {/* OBJETIVOS TAB */}
-      <ObjectivesManager
-        activeTab={activeTab}
-        session={session}
-        setSession={setSession}
-        notes={notes}
-        setNotes={setNotes}
-        plantillas={plantillas}
-        setPlantillas={setPlantillas}
-      />
-
-      {/* HISTORIAL TAB */}
-      <HistoryManager
-        activeTab={activeTab}
-        historial={historial}
-        setHistorial={setHistorial}
-        setSession={setSession}
-        setActiveTab={setActiveTab}
-        showSaved={showSaved}
-      />
-
-      {/* TIKTOK TAB */}
-      <TikTokManager
-        activeTab={activeTab}
-        ttStatus={ttStatus}
-        setTtStatus={setTtStatus}
-        config={config}
-        saveConfig={saveConfig}
-        showSaved={showSaved}
-        poll={poll}
-        setPoll={setPoll}
-        isPollActive={isPollActive}
-        setIsPollActive={setIsPollActive}
-        chatHistory={chatHistory}
-        queueData={queueData}
-      />
-    </>
+      </div>
+    </div>
   );
 }

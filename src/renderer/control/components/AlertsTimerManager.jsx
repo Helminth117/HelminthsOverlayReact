@@ -104,12 +104,11 @@ export default function AlertsTimerManager({
           <input type="range" className="slider" min="1" max="10" step="0.5" value={(config.alertDuration || 4000) / 1000} style={{ width: 150 }} onChange={(e) => saveConfig({ alertDuration: parseFloat(e.target.value) * 1000 })} />
         </div>
         <div className="flex items-center justify-between mb-sm">
-          <span className="text-sm">Posición</span>
-          <select className="inp" style={{ width: 'auto' }} value={config.alertPosition || 'bottom'} onChange={(e) => saveConfig({ alertPosition: e.target.value })}>
-            <option value="bottom">Abajo (Bottom)</option>
-            <option value="top">Arriba (Top)</option>
-            <option value="center">Centro (Center)</option>
-          </select>
+          <span className="text-sm">Altura Alertas (Top Offset)</span>
+          <div className="flex items-center gap-xs">
+            <input type="range" className="slider" min="10" max="800" step="10" value={config.alertTop !== undefined ? config.alertTop : 40} style={{ width: 120 }} onChange={(e) => saveConfig({ alertTop: parseInt(e.target.value) || 0 })} />
+            <span className="text-xs" style={{ width: 45, textAlign: 'right', fontWeight: 'bold' }}>{config.alertTop !== undefined ? config.alertTop : 40}px</span>
+          </div>
         </div>
         <div className="flex items-center justify-between mb-sm">
           <span className="text-sm">Sonido Activado</span>

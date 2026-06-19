@@ -55,10 +55,42 @@ function updateConfig(partial) {
   return cachedConfig;
 }
 
+const tempAllowedPaths = new Set();
+
+function addTempAllowedPath(filePath) {
+  try {
+    tempAllowedPaths.add(require('path').resolve(filePath));
+  } catch (_) {}
+}
+
+function isPathAllowed(filePath) {
+  try {
+    const resolved = require('path').resolve(filePath);
+    if (tempAllowedPaths.has(resolved)) return true;
+    
+    const config = getConfig();
+    if (config) {
+      if (config.gameImage && require('path').resolve(config.gameImage.replace('local-file://', '')) === resolved) {
+        return true;
+      }
+      if (Array.isArray(config.gameProfiles)) {
+        for (const p of config.gameProfiles) {
+          if (p.imageUrl && require('path').resolve(p.imageUrl.replace('local-file://', '')) === resolved) {
+            return true;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
 module.exports = {
   readJSON,
   writeJSON,
   getConfig,
   updateConfig,
-  setConfigChangeCallback
+  setConfigChangeCallback,
+  addTempAllowedPath,
+  isPathAllowed
 };

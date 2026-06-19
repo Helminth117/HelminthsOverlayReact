@@ -27,6 +27,17 @@ export default defineConfig({
           }
         }
       },
+      {
+        entry: 'src/preload/yt-preload.js',
+        onstart(options) {
+          options.reload()
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron/preload'
+          }
+        }
+      },
     ]),
     renderer(),
   ],

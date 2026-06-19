@@ -15,6 +15,9 @@ class TikTokService {
     this.userGifts = {};
     this.retryInterval = null;
     this.reconnectTimeout = null;
+    this.flushInterval = null;
+    this.likeBuffer = {};
+    this.statsDirty = false;
     this.username = '';
     this.banlist = [];
     this.loadBanlist();
@@ -38,6 +41,7 @@ class TikTokService {
   stop() {
     if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
     if (this.retryInterval) { clearInterval(this.retryInterval); this.retryInterval = null; }
+    if (this.flushInterval) { clearInterval(this.flushInterval); this.flushInterval = null; }
     if (this.connection) {
       this.connection.removeAllListeners();
       try { this.connection.disconnect(); } catch(e) {}
@@ -46,10 +50,44 @@ class TikTokService {
     this.stats.connected = false;
   }
 
+  flushBufferedEvents() {
+    let likesUpdated = false;
+    for (const [user, count] of Object.entries(this.likeBuffer)) {
+      this.userLikes[user] = (this.userLikes[user] || 0) + count;
+      if (this.userLikes[user] > this.stats.topLikerCount) {
+        this.stats.topLiker = user;
+        this.stats.topLikerCount = this.userLikes[user];
+      }
+      this.broadcast('tiktok-like', { user, count });
+      likesUpdated = true;
+    }
+    this.likeBuffer = {};
+
+    if (likesUpdated) {
+      // Prevent memory leak by keeping only top 100 if we exceed 500 users
+      const likeKeys = Object.keys(this.userLikes);
+      if (likeKeys.length > 500) {
+        const sorted = likeKeys.sort((a,b) => this.userLikes[b] - this.userLikes[a]);
+        const newLikes = {};
+        for(let i=0; i<100; i++) newLikes[sorted[i]] = this.userLikes[sorted[i]];
+        this.userLikes = newLikes;
+      }
+      this.statsDirty = true;
+    }
+
+    if (this.statsDirty) {
+      this.broadcast('tiktok-stats', this.stats);
+      this.statsDirty = false;
+    }
+  }
+
   async tryConnect(username) {
     try {
       if (this.connection) { this.connection.removeAllListeners(); try { this.connection.disconnect(); } catch(e) {} this.connection = null; }
       this.connection = new WebcastPushConnection(username, { enableExtendedGiftInfo: true });
+
+      if (this.flushInterval) clearInterval(this.flushInterval);
+      this.flushInterval = setInterval(() => this.flushBufferedEvents(), 1000);
 
       this.connection.on('disconnected', () => {
         console.log('[TikTok] Disconnected, retrying...');
@@ -60,34 +98,21 @@ class TikTokService {
       });
       this.connection.on('roomUser', d => {
         this.stats.viewers = d?.viewerCount || d?.viewer_count || 0;
-        this.broadcast('tiktok-stats', this.stats);
+        this.statsDirty = true;
       });
       this.connection.on('like', d => {
         const amt = d?.likeCount || d?.like_count || 1;
         this.stats.likes += amt;
         const user = d?.uniqueId || d?.user?.uniqueId || d?.nickname || 'alguien';
-        this.userLikes[user] = (this.userLikes[user] || 0) + amt;
-        if (this.userLikes[user] > this.stats.topLikerCount) {
-          this.stats.topLiker = user;
-          this.stats.topLikerCount = this.userLikes[user];
-        }
-
-        // Prevent memory leak by keeping only top 100 if we exceed 500 users
-        const likeKeys = Object.keys(this.userLikes);
-        if (likeKeys.length > 500) {
-          const sorted = likeKeys.sort((a,b) => this.userLikes[b] - this.userLikes[a]);
-          const newLikes = {};
-          for(let i=0; i<100; i++) newLikes[sorted[i]] = this.userLikes[sorted[i]];
-          this.userLikes = newLikes;
-        }
-        this.broadcast('tiktok-stats', this.stats);
-        this.broadcast('tiktok-like', { user, count: amt });
+        
+        this.likeBuffer[user] = (this.likeBuffer[user] || 0) + amt;
+        this.statsDirty = true;
       });
       this.connection.on('follow', d => {
         this.stats.followers_gained++;
         const user = d?.uniqueId || d?.user?.uniqueId || d?.nickname || 'alguien';
         this.stats.latestFollower = user;
-        this.broadcast('tiktok-stats', this.stats);
+        this.statsDirty = true;
         this.broadcast('stream-alert', { type: 'follow', user, message: `¡@${user} te siguió!` });
         const cfg = this.getConfig();
         if (cfg.followersGoal && this.stats.followers_gained >= cfg.followersGoal) {
@@ -115,12 +140,12 @@ class TikTokService {
           for(let i=0; i<100; i++) newGifts[sorted[i]] = this.userGifts[sorted[i]];
           this.userGifts = newGifts;
         }
-        this.broadcast('tiktok-stats', this.stats);
+        this.statsDirty = true;
         this.broadcast('stream-alert', { type: 'gift', user, gift, count });
       });
       this.connection.on('member', d => {
         this.stats.viewers = Math.max(this.stats.viewers, 1);
-        this.broadcast('tiktok-stats', this.stats);
+        this.statsDirty = true;
       });
       this.connection.on('chat', d => {
         const user = d?.uniqueId || d?.user?.uniqueId || d?.nickname || 'alguien';

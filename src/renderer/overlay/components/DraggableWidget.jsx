@@ -22,7 +22,7 @@ export function DraggableWidget({ id, title, children, isGlass, noContainer = fa
     <div
       ref={elRef}
       id={id}
-      className={`drag-item ${visible ? 'visible' : ''} ${isGlass ? 'glass' : (noContainer ? '' : 'solid')} ${className}`}
+      className={`drag-item ${visible ? 'visible' : ''} ${noContainer ? '' : (isGlass ? 'glass' : 'solid')} ${className}`}
       data-title={title}
       style={{
         ...style,

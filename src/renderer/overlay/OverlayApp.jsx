@@ -1,6 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { useOverlayStore } from '../store';
-import { SVGS, getGameEmoji } from './constants';
+import { SVGS } from './constants';
+import { Eye, Heart, Share2, LogIn, Crown, Trophy, Bot, Gamepad2, UserPlus, Gift, Bell, HelpCircle } from 'lucide-react';
+
+const ChipIcon = ({ id, fallbackIcon }) => {
+  const map = {
+    view: Eye,
+    viewers: Eye,
+    like: Heart,
+    likes: Heart,
+    share: Share2,
+    shares: Share2,
+    join: LogIn,
+    joins: LogIn,
+    follow: UserPlus,
+    follower: UserPlus,
+    sub: Crown,
+    subscription: Crown,
+    gift: Gift,
+    goal: Trophy,
+    bot: Bot,
+    game: Gamepad2,
+    bell: Bell
+  };
+  const Icon = map[id];
+  if (Icon) {
+    return <Icon size={14} strokeWidth={2.2} style={{ color: 'var(--accent)' }} />;
+  }
+  return <span style={{ fontSize: '12px' }}>{fallbackIcon || '🎮'}</span>;
+};
 import { DraggableWidget } from './components/DraggableWidget';
 import AlertManager from './components/AlertManager';
 import ChatManager from './components/ChatManager';
@@ -18,6 +46,20 @@ import LyricsDisplay from './components/LyricsDisplay';
 import TimerDisplay from './components/TimerDisplay';
 import OverlayBackground from './components/OverlayBackground';
 import OverlayControls from './components/OverlayControls';
+import ChatAvatars from './components/ChatAvatars';
+const getOverlayImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('local-file://')) {
+    const filePath = url.replace('local-file://', '');
+    if (window.location.protocol === 'file:') {
+      return url;
+    }
+    const token = new URLSearchParams(window.location.search).get('token') || '';
+    const apiBase = window.location.port === '5173' ? 'http://localhost:3030' : window.location.origin;
+    return `${apiBase}/api/local-media?path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(token)}`;
+  }
+  return url;
+};
 
 export default function OverlayApp() {
   const { config, setConfig, setIsMoving, isMoving, setGameName, setTimer } = useOverlayStore();
@@ -88,22 +130,38 @@ export default function OverlayApp() {
     return () => window.removeEventListener('resize', window.syncCorners);
   }, []);
 
+  const [apiReady, setApiReady] = useState(!!window.api);
+
   useEffect(() => {
-    if (!window.api) return;
+    if (window.api) {
+      setApiReady(true);
+      return;
+    }
+    const handleReady = () => setApiReady(true);
+    window.addEventListener('api-ready', handleReady);
+    return () => window.removeEventListener('api-ready', handleReady);
+  }, []);
 
-    window.api.getConfig().then(cfg => {
-      if (cfg) setConfig(cfg);
-    });
+  useEffect(() => {
+    if (!apiReady) return;
 
-    window.api.getSession().then(session => {
-      if (session && session.timerSeconds !== undefined) {
-        setTimer({
-          seconds: session.timerSeconds,
-          mode: session.timerMode || 'chrono',
-          running: false
-        });
-      }
-    });
+    const fetchConfig = () => {
+      window.api.getConfig().then(cfg => {
+        if (cfg) setConfig(cfg);
+      });
+      window.api.getSession().then(session => {
+        if (session && session.timerSeconds !== undefined) {
+          setTimer({
+            seconds: session.timerSeconds,
+            mode: session.timerMode || 'chrono',
+            running: false
+          });
+        }
+      });
+    };
+
+    fetchConfig();
+    window.addEventListener('api-connected', fetchConfig);
 
     let _saveLayoutTimeout;
     window.saveLayout = () => {
@@ -176,12 +234,13 @@ export default function OverlayApp() {
     });
 
     return () => {
+      window.removeEventListener('api-connected', fetchConfig);
       Object.entries(registeredHandlers).forEach(([ch, handler]) => {
         if (handler) window.api.off(ch, handler);
       });
       clearTimeout(_saveLayoutTimeout);
     };
-  }, []);
+  }, [apiReady]);
 
   // Theme logic
   useEffect(() => {
@@ -243,15 +302,36 @@ export default function OverlayApp() {
   }, [config]);
 
   useEffect(() => {
-    if (config?.gameImage) {
+    const imageUrl = getOverlayImageUrl(config?.gameImage);
+    if (imageUrl) {
       setBgFading(true);
       const img = new Image();
       img.onload = () => {
-        setBgImage(config.gameImage);
+        setBgImage(imageUrl);
         setBgFading(false);
       };
       img.onerror = () => {
-        if (config.gameImage.includes('library_600x900')) {
+        // Fallback: If it's a local-file cache path that failed, retrieve the appId and try Steam CDN library art
+        if (config.gameImage && config.gameImage.startsWith('local-file://')) {
+          const match = config.gameImage.match(/(\d+)_(?:upscaled|2x)/);
+          if (match) {
+            const appId = match[1];
+            const fallbackUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`;
+            const altImg = new Image();
+            altImg.onload = () => {
+              setBgImage(fallbackUrl);
+              setBgFading(false);
+            };
+            altImg.onerror = () => {
+              setBgImage('');
+              setBgFading(false);
+            };
+            altImg.src = fallbackUrl;
+            return;
+          }
+        }
+
+        if (config.gameImage && config.gameImage.includes('library_600x900')) {
           const altImg = new Image();
           const altUrl = config.gameImage.replace('library_600x900', 'header');
           altImg.onload = () => {
@@ -264,7 +344,7 @@ export default function OverlayApp() {
           setBgFading(false);
         }
       };
-      img.src = config.gameImage;
+      img.src = imageUrl;
     } else {
       setBgFading(true);
       setTimeout(() => {
@@ -312,10 +392,11 @@ export default function OverlayApp() {
       <DraggableWidget id="comp-socials" title="Redes Sociales" isGlass={config?.glassWidgets?.socials !== false} defaultPos={{ t: '80px', l: '20px' }}>
         <div id="social-stack" className="social-row">
           {config?.social?.filter(s => s.visible && s.handle).map((s, idx) => {
-            const iconKey = s.icon || s.id;
+            const iconKey = (s.icon || s.id || '').toLowerCase();
+            const svgContent = SVGS[iconKey] || SVGS[s.id?.toLowerCase()] || '';
             return (
               <div key={idx} className="social-pill">
-                <span dangerouslySetInnerHTML={{ __html: SVGS[iconKey] || '' }} />
+                <span dangerouslySetInnerHTML={{ __html: svgContent }} />
                 <b>{s.handle}</b>
               </div>
             );
@@ -328,7 +409,10 @@ export default function OverlayApp() {
       {config?.game?.filter(c => c.visible !== false).map((c, i) => (
         <DraggableWidget key={c.id} id={`comp-chip-${c.id}`} title={c.label} isGlass={config?.glassWidgets?.chips !== false} className="dynamic-chip" style={{ display: config?.widgets?.chips !== false ? 'flex' : 'none', top: `${250 + i * 45}px`, left: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', padding: '0 4px', whiteSpace: 'nowrap' }}>
-            <span>{getGameEmoji(c.id, c.icon, config?.gameName)}</span>{c.label}: <b>{c.value}</b>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChipIcon id={c.id} fallbackIcon={c.icon} />
+            </span>
+            {c.label}: <b>{c.value}</b>
           </div>
         </DraggableWidget>
       ))}
@@ -376,6 +460,8 @@ export default function OverlayApp() {
       <DraggableWidget id="comp-local-media" title="Música Local" isGlass={false} noContainer={true}>
         <WinIsland />
       </DraggableWidget>
+
+      <ChatAvatars />
 
       <AlertManager />
       <AudioManager />

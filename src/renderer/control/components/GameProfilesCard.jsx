@@ -144,7 +144,7 @@ export default function GameProfilesCard({
             </div>
           ))}
         </div>
-        <button className="btn btn-ghost w-full" onClick={() => saveConfig({ game: [...config.game, { id: uid(), icon: '🎮', label: '', value: '', visible: true }] })}>+ Añadir Dato</button>
+        <button className="btn btn-ghost w-full" onClick={() => saveConfig({ game: [...config.game, { id: 'x' + Date.now() + Math.random().toString(36).substr(2, 9), icon: '🎮', label: '', value: '', visible: true }] })}>+ Añadir Dato</button>
       </div>
     </section>
   );

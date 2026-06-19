@@ -10,13 +10,17 @@ function broadcast(channel, data) {
   [overlayWin, controlWin].forEach(w => {
     if (w && !w.isDestroyed()) w.webContents.send(channel, data);
   });
+  const remoteServer = require('./server');
+  remoteServer.broadcastEvent(channel, data);
 }
 
 function createOverlay() {
   const display = screen.getPrimaryDisplay();
+  // 9:16 vertical — 607×1080 (HD height, narrow width, good capture quality)
+  const W = 607, H = 1080;
   overlayWin = new BrowserWindow({
-    width: 540, height: 960,
-    x: Math.floor((display.bounds.width - 540) / 2), y: 50,
+    width: W, height: H,
+    x: Math.max(0, Math.floor((display.bounds.width - W) / 2)), y: 0,
     transparent: true, frame: false,
     backgroundColor: '#00000000',
     alwaysOnTop: true, skipTaskbar: true,

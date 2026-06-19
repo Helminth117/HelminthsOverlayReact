@@ -4,6 +4,40 @@ const https = require('https');
 const path = require('path');
 const fs = require('fs');
 
+// Redirect stdout/stderr to a file for troubleshooting
+const logFilePath = path.join(app.getPath('userData'), 'app.log');
+try {
+  if (fs.existsSync(logFilePath)) {
+    const stats = fs.statSync(logFilePath);
+    if (stats.size > 5 * 1024 * 1024) { // 5MB limit
+      if (fs.existsSync(logFilePath + '.old')) {
+        fs.unlinkSync(logFilePath + '.old');
+      }
+      fs.renameSync(logFilePath, logFilePath + '.old');
+    }
+  }
+} catch (e) {
+  // Ignore filesystem errors during boot
+}
+const logFile = fs.createWriteStream(logFilePath, { flags: 'a' });
+const originalLog = console.log;
+const originalError = console.error;
+
+console.log = function(...args) {
+  const msg = `[${new Date().toLocaleTimeString()}] ` + args.map(x => typeof x === 'object' ? JSON.stringify(x) : x).join(' ');
+  logFile.write(msg + '\n');
+  originalLog.apply(console, args);
+};
+
+console.error = function(...args) {
+  const msg = `[${new Date().toLocaleTimeString()}] [ERROR] ` + args.map(x => typeof x === 'object' ? JSON.stringify(x) : x).join(' ');
+  logFile.write(msg + '\n');
+  originalError.apply(console, args);
+};
+
+console.log('--- SESSION STARTED ---');
+console.log('UserData Path:', app.getPath('userData'));
+
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
 if (!app.isPackaged) {
@@ -54,6 +88,17 @@ app.whenReady().then(() => {
     }
     const filePath = path.resolve(rawPath);
     
+    // Restrict access to whitelisted paths or app files
+    const appPath = path.resolve(app.getAppPath());
+    const userDataPath = path.resolve(app.getPath('userData'));
+    
+    const isAppFile = filePath.startsWith(appPath) || filePath.startsWith(userDataPath);
+    const isAllowed = isAppFile || store.isPathAllowed(filePath);
+    
+    if (!isAllowed) {
+      return new Response('Forbidden: path not whitelisted', { status: 403 });
+    }
+
     const ext = path.extname(filePath).toLowerCase();
     const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.ico', '.webm', '.mp4'];
     if (!allowedExts.includes(ext)) {

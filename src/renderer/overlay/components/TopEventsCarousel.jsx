@@ -60,7 +60,7 @@ export default function TopEventsCarousel() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center' }}>
             <span style={{ fontSize: '10px', color: 'var(--text3)', fontWeight: 800, lineHeight: 1.1, whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'center', whiteSpace: 'pre-line' }}>{s.label}</span>
-            <span id={`top-${s.type}`} style={{ fontWeight: 900, fontSize: '14px', color: '#ffffff', WebkitTextStroke: '0.5px var(--accent)', textShadow: '0 2px 4px rgba(0,0,0,0.8)', marginTop: '2px', width: '100%', textAlign: 'center', whiteSpace: 'normal', wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.value}</span>
+            <span id={`top-${s.type}`} style={{ fontWeight: 900, fontSize: '14px', color: '#ffffff', textShadow: '0 2px 4px rgba(0,0,0,0.8)', marginTop: '2px', width: '100%', textAlign: 'center', whiteSpace: 'normal', wordBreak: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.value}</span>
           </div>
         </div>
       ))}

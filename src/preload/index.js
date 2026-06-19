@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, clipboard } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   // ── Config ──
@@ -39,7 +39,7 @@ contextBridge.exposeInMainWorld('api', {
       'session-updated', 'config-updated', 'tiktok-stats', 'tiktok-like',
       'item-completed', 'timer-tick', 'stream-alert', 'game-detected', 'tiktok-chat', 'media-updated', 'auto-toggle-social', 'play-soundboard', 'yt-ended', 'yt-time', 'highlight-chat',
       'yt-pause', 'yt-resume', 'yt-stop', 'yt-skip',
-      'queue-updated', 'move-mode', 'pin-message'
+      'queue-updated', 'move-mode', 'pin-message', 'tunnel-status'
     ];
     if (allowed.includes(channel)) {
       const handler = (_e, ...args) => cb(...args);
@@ -93,4 +93,5 @@ contextBridge.exposeInMainWorld('api', {
   toggleAutoDetect:   (val)      => ipcRenderer.invoke('toggle-auto-detect', val),
   forceGameDetect:    ()         => ipcRenderer.invoke('force-game-detect'),
   selectImage:        ()         => ipcRenderer.invoke('select-image'),
+  writeClipboard:     (text)     => clipboard.writeText(text),
 });

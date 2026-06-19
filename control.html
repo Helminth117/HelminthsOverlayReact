@@ -4,6 +4,156 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HelminthsOverlay — Control</title>
+  <script>
+    (function() {
+      // If we are running in Electron, window.ipcRenderer or window.api is already exposed
+      if (window.api || window.ipcRenderer) {
+        return;
+      }
+
+      // We are in a browser (mobile remote mode)
+      const token = new URLSearchParams(window.location.search).get('token') || '';
+
+      const debugMode = false;
+      function logDebug(msg) {
+        if (debugMode) console.log("[Remote Control Debug]", msg);
+      }
+
+      let socketHost = window.location.origin;
+      let scriptUrl = window.location.origin + '/assets/socketio.js';
+
+      if (window.location.port === '5173') {
+        socketHost = 'http://localhost:3030';
+        scriptUrl = 'http://localhost:3030/assets/socketio.js';
+      }
+
+      const CDN_FALLBACK = 'https://cdn.socket.io/4.8.0/socket.io.min.js';
+
+      function initSocket() {
+        if (!window.io) {
+          console.error("Socket.io failed to load.");
+          return;
+        }
+
+        // Initialize Socket forcing websocket transport to optimize network and eliminate HTTP polling overhead
+        const socket = io(socketHost, {
+          auth: { token },
+          query: { token },
+          transports: ['websocket']
+        });
+
+        const listeners = {};
+
+        socket.onAny((event, ...args) => {
+          logDebug(`Socket event received: "${event}"`);
+          let targetEvent = event;
+          if (event === 'config-loaded') {
+            targetEvent = 'config-updated';
+          }
+          if (listeners[targetEvent]) {
+            listeners[targetEvent].forEach(cb => cb(...args));
+          }
+        });
+
+        socket.on('connect', () => {
+          logDebug(`Socket connected successfully! ID: ${socket.id}`);
+          window.dispatchEvent(new CustomEvent('api-connected'));
+        });
+
+        const callRpc = (method, args = []) => {
+          return new Promise((resolve, reject) => {
+            socket.emit('api-request', { method, args }, (res) => {
+              if (res && res.success) {
+                resolve(res.data);
+              } else {
+                reject(new Error(res ? res.error : 'Unknown RPC error'));
+              }
+            });
+          });
+        };
+
+        const sendEvent = (method, arg) => {
+          socket.emit('api-request', { method, args: [arg] });
+        };
+
+        window.api = {
+          getConfig: () => callRpc('getConfig'),
+          saveConfig: (data) => callRpc('saveConfig', [data]),
+          getSession: () => callRpc('getSession'),
+          saveSession: (data) => callRpc('saveSession', [data]),
+          getHistorial: () => callRpc('getHistorial'),
+          guardarSesion: () => callRpc('guardarSesion'),
+          continuarSesion: (idx) => callRpc('continuarSesion', [idx]),
+          deleteHistorial: (idx) => callRpc('deleteHistorial', [idx]),
+          getPlantillas: () => callRpc('getPlantillas'),
+          savePlantillas: (data) => callRpc('savePlantillas', [data]),
+          getNotes: () => callRpc('getNotes'),
+          saveNotes: (text) => callRpc('saveNotes', [text]),
+          tiktokConnect: (user) => callRpc('tiktokConnect', [user]),
+          tiktokReset: () => callRpc('tiktokReset'),
+          getGameProfiles: () => callRpc('getGameProfiles'),
+          saveGameProfiles: (profiles) => callRpc('saveGameProfiles', [profiles]),
+          scanPcGames: () => callRpc('scanPcGames'),
+          toggleAutoDetect: (val) => callRpc('toggleAutoDetect', [val]),
+          forceGameDetect: () => callRpc('forceGameDetect'),
+          getRemoteInfo: () => callRpc('getRemoteInfo'),
+          searchYoutube: (query, opts) => callRpc('searchYoutube', [{ query, opts }]),
+          
+          // Event emission mapping to RPC
+          emitTimer: (data) => sendEvent('emitTimer', data),
+          timerTick: (data) => sendEvent('emitTimer', data),
+          itemCompleted: (data) => sendEvent('emitItemCompleted', data),
+          emitItemCompleted: (data) => sendEvent('emitItemCompleted', data),
+          previewAlert: (data) => sendEvent('previewAlert', data),
+          playSoundboard: (id) => sendEvent('playSoundboard', id),
+          testChatTts: (msg) => sendEvent('testChatTts', msg),
+          pinChatMessage: (data) => sendEvent('pinChatMessage', data),
+          setMoveMode: (active) => sendEvent('setMoveMode', active),
+          ytPause: () => sendEvent('ytPause'),
+          ytResume: () => sendEvent('ytResume'),
+          ytStop: () => sendEvent('ytStop'),
+          ytSkip: () => sendEvent('ytSkip'),
+          ytSetVolume: (vol) => sendEvent('ytSetVolume', vol),
+          sendQueueUpdate: (queue) => sendEvent('sendQueueUpdate', queue),
+          
+          // Local/Mock functions
+          getDesktopAudioId: () => Promise.resolve(null),
+          getAudioStreamUrl: () => Promise.resolve(null),
+          getLyrics: () => Promise.resolve(null),
+          selectImage: () => Promise.resolve(null),
+          writeClipboard: (text) => {
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(text);
+            }
+          },
+
+          on: (channel, cb) => {
+            if (!listeners[channel]) listeners[channel] = [];
+            listeners[channel].push(cb);
+            return cb;
+          },
+          off: (channel, cb) => {
+            if (listeners[channel]) {
+              listeners[channel] = listeners[channel].filter(x => x !== cb);
+            }
+          }
+        };
+
+        window.dispatchEvent(new CustomEvent('api-ready'));
+      }
+
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.onload = initSocket;
+      script.onerror = () => {
+        const fallbackScript = document.createElement('script');
+        fallbackScript.src = CDN_FALLBACK;
+        fallbackScript.onload = initSocket;
+        document.head.appendChild(fallbackScript);
+      };
+      document.head.appendChild(script);
+    })();
+  </script>
 </head>
 <body class="bg-gray-900 text-white overflow-hidden">
   <div id="root"></div>

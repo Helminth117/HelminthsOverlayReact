@@ -1,11 +1,26 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useOverlayStore } from '../../store';
 import { TTSFilter } from '../utils/ttsFilter';
-import { getGemSVG } from '../utils/gemIcons';
 import { launchAlertConfeti } from '../utils/confettiHelper';
+import { UserPlus, Gift, Gamepad2, Trophy, Bot, Bell } from 'lucide-react';
+
+const getOverlayImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('local-file://')) {
+    const filePath = url.replace('local-file://', '');
+    if (window.location.protocol === 'file:') {
+      return url;
+    }
+    const token = new URLSearchParams(window.location.search).get('token') || '';
+    const apiBase = window.location.port === '5173' ? 'http://localhost:3030' : window.location.origin;
+    return `${apiBase}/api/local-media?path=${encodeURIComponent(filePath)}&token=${encodeURIComponent(token)}`;
+  }
+  return url;
+};
 
 export default function AlertManager() {
   const [currentAlert, setCurrentAlert] = useState(null);
+  const [fadingOut, setFadingOut] = useState(false);
   const config = useOverlayStore(s => s.config) || {};
   const alertQueueRef = useRef([]);
   const alertRunningRef = useRef(false);
@@ -19,6 +34,7 @@ export default function AlertManager() {
     const data = alertQueueRef.current.shift();
     
     setCurrentAlert({ ...data, id: Date.now() + Math.random() });
+    setFadingOut(false);
     
     if (window.playAlertSound) window.playAlertSound(data.type || 'follow');
 
@@ -38,14 +54,21 @@ export default function AlertManager() {
       }
     }
 
-    if (data.type === 'follow') launchAlertConfeti('#1D9E75');
-    else if (data.type === 'gift') launchAlertConfeti('#e0a95c');
-    else if (data.type === 'goal') launchAlertConfeti('#a78bfa');
+    if (data.type === 'follow') launchAlertConfeti(config.accent || '#1D9E75');
+    else if (data.type === 'gift') launchAlertConfeti('#f59e0b');
+    else if (data.type === 'goal') launchAlertConfeti('#a855f7');
+
+    const duration = data.duration || config.alertDuration || 4000;
+    
+    // Start fading out 1000ms before removing the alert to let the Xbox exit animations play fully
+    setTimeout(() => {
+      setFadingOut(true);
+    }, Math.max(0, duration - 1000));
 
     setTimeout(() => {
       setCurrentAlert(null);
       setTimeout(() => processAlertQueue(), 300);
-    }, data.duration || 4000);
+    }, duration);
   };
 
   useEffect(() => {
@@ -95,91 +118,69 @@ export default function AlertManager() {
 
   if (!currentAlert) return null;
 
-  const renderAlertContent = () => {
-    const data = currentAlert;
-    if (data.type === 'bot') {
-      return (
-        <>
-          <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(1, '#8b5cf6', '#4c1d95') }} />
-          <div>
-            <div className="alert-title" style={{ color: '#fff', WebkitTextStroke: '0.5px var(--accent)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🤖 Bot del Stream</div>
-            <div className="alert-name" style={{ fontSize: '14px', whiteSpace: 'normal', lineHeight: '1.2', color: '#fff', WebkitTextStroke: '0.5px var(--accent)', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{data.message}</div>
-          </div>
-        </>
-      );
-    } else if (data.type === 'follow') {
-      return (
-        <>
-          <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(2, '#10b981', '#047857') }} />
-          <div>
-            <div className="alert-title">Nuevo seguidor</div>
-            <div className="alert-name">{data.user || 'usuario'}</div>
-          </div>
-        </>
-      );
-    } else if (data.type === 'gift') {
-      return (
-        <>
-          <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(4, '#f59e0b', '#b45309') }} />
-          <div>
-            <div className="alert-title">{data.user || 'usuario'} ha regalado</div>
-            <div className="alert-name">{data.count || 1} de {data.gift || 'regalo'}</div>
-          </div>
-        </>
-      );
-    } else if (data.type === 'goal') {
-      return (
-        <>
-          <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(3, '#a855f7', '#7e22ce') }} />
-          <div>
-            <div className="alert-title">¡Meta alcanzada!</div>
-            <div className="alert-name">{data.message || '¡Felicidades!'}</div>
-          </div>
-        </>
-      );
-    } else if (data.type === 'game') {
-      if (data.imageUrl) {
-        return (
-          <div style={{ zIndex: 2, flex: 1, textAlign: 'right' }}>
-            <div className="alert-title" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)', color: 'rgba(255,255,255,0.9)' }}>Jugando ahora</div>
-            <div className="alert-name" style={{ textShadow: '0 2px 6px rgba(0,0,0,1)', fontSize: '1.1em' }}>{data.message || 'Juego detectado'}</div>
-          </div>
-        );
-      } else {
-        return (
-          <>
-            <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(1, 'var(--accent)', '#fff') }} />
-            <div>
-              <div className="alert-title">Jugando ahora</div>
-              <div className="alert-name">{data.message || 'Juego detectado'}</div>
-            </div>
-          </>
-        );
-      }
-    } else {
-      return (
-        <>
-          <div className="alert-icon" style={{ width: '50px', height: '50px', animation: 'float3d 3s ease-in-out infinite' }} dangerouslySetInnerHTML={{ __html: getGemSVG(2, '#10b981', '#047857') }} />
-          <div>
-            <div className="alert-title">{data.title || 'Alerta'}</div>
-            <div className="alert-name">{data.message || data.user || ''}</div>
-          </div>
-        </>
-      );
-    }
-  };
+  let typeLabel = 'LOGRO DESBLOQUEADO';
+  let nameText = '';
+  let IconComponent = Trophy;
+  let accentColor = config.accent || '#107c11';
+  
+  const data = currentAlert;
+  if (data.type === 'follow') {
+    typeLabel = 'SEGUIDOR NUEVO';
+    nameText = data.user || 'Usuario';
+    IconComponent = UserPlus;
+    accentColor = config.accent || '#107c11';
+  } else if (data.type === 'gift') {
+    typeLabel = 'REGALO RECIBIDO';
+    nameText = `${data.count || 1}x ${data.gift || 'Regalo'} de ${data.user || 'Usuario'}`;
+    IconComponent = Gift;
+    accentColor = '#f59e0b';
+  } else if (data.type === 'goal') {
+    typeLabel = 'META COMPLETADA';
+    nameText = data.message || '¡Felicidades!';
+    IconComponent = Trophy;
+    accentColor = '#a855f7';
+  } else if (data.type === 'bot') {
+    typeLabel = 'NOTIFICACIÓN BOT';
+    nameText = data.message || '';
+    IconComponent = Bot;
+    accentColor = config.accent || '#107c11';
+  } else if (data.type === 'game') {
+    typeLabel = 'JUGANDO AHORA';
+    nameText = data.message || 'Juego detectado';
+    IconComponent = Gamepad2;
+    accentColor = config.accent || '#107c11';
+  } else {
+    typeLabel = data.title || 'LOGRO DESBLOQUEADO';
+    nameText = data.message || data.user || '';
+    IconComponent = Bell;
+    accentColor = config.accent || '#107c11';
+  }
 
-  const isGameImage = currentAlert.type === 'game' && currentAlert.imageUrl;
-  const containerStyle = isGameImage ? {
-    background: `linear-gradient(to right, rgba(15,23,42,0) 0%, rgba(15,23,42,0.9) 60%, rgba(15,23,42,1) 100%), url('${currentAlert.imageUrl}') left center / cover no-repeat`,
-    borderColor: 'var(--accent)',
-    padding: '14px 20px 14px 100px'
-  } : currentAlert.type === 'bot' ? { borderColor: 'var(--accent)' } : currentAlert.type === 'game' ? { background: 'rgba(var(--accent-rgb),0.2)', borderColor: 'var(--accent)' } : {};
+  const alertImageUrl = data.imageUrl || (data.type === 'game' ? config.gameImage : null);
+  const resolvedImageUrl = alertImageUrl ? getOverlayImageUrl(alertImageUrl) : null;
+
+  const pillStyle = resolvedImageUrl ? {
+    backgroundImage: `linear-gradient(90deg, rgba(16, 16, 22, 0.9) 0%, rgba(16, 16, 22, 0.7) 100%), url(${resolvedImageUrl})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center'
+  } : {};
 
   return (
-    <div id="alert-container" style={{ position: 'fixed', top: '15%', right: '20px', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'none' }}>
-      <div key={currentAlert.id} className={`stream-alert show ${currentAlert.type || 'follow'}`} style={containerStyle}>
-        {renderAlertContent()}
+    <div id="alert-container" style={{ position: 'fixed', top: `${config.alertTop !== undefined ? config.alertTop : 40}px`, bottom: 'auto', left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'none' }}>
+      <div key={currentAlert.id} className={`xbox-alert ${data.type || 'follow'} ${fadingOut ? 'hide' : 'show'}`} style={{ '--xbox-accent': accentColor }}>
+        <div className="xbox-circle-wrap">
+          <div className="xbox-circle">
+            <span className="xbox-pixel-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: accentColor }}>
+              <IconComponent size={26} strokeWidth={2.2} />
+            </span>
+          </div>
+        </div>
+        <div className="xbox-pill" style={pillStyle}>
+          <div className="xbox-text-container">
+            <span className="xbox-type-label">{typeLabel}</span>
+            <span className="xbox-name-text">{nameText}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

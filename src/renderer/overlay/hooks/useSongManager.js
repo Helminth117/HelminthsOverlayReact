@@ -48,7 +48,8 @@ export function useSongManager() {
     window.dispatchEvent(new CustomEvent('lyrics-update', {
       detail: {
         prev: '',
-        current: ''
+        current: '',
+        next: ''
       }
     }));
   };
@@ -94,13 +95,15 @@ export function useSongManager() {
       lastSyncedIndexRef.current = currentIndex;
       const currentText = currentIndex >= 0 ? currentLyrics.current[currentIndex].text : '';
       const prevText = currentIndex > 0 ? currentLyrics.current[currentIndex - 1].text : '';
+      const nextText = (currentIndex >= 0 && currentIndex < currentLyrics.current.length - 1) ? currentLyrics.current[currentIndex + 1].text : '';
       if (window.api?.saveNotes) {
-        window.api.saveNotes(`[AUDIO-LOG] syncLyrics: current="${currentText}", prev="${prevText}", time=${ct}`);
+        window.api.saveNotes(`[AUDIO-LOG] syncLyrics: current="${currentText}", prev="${prevText}", next="${nextText}", time=${ct}`);
       }
       window.dispatchEvent(new CustomEvent('lyrics-update', {
         detail: {
           prev: prevText,
-          current: currentText
+          current: currentText,
+          next: nextText
         }
       }));
     }

@@ -3,8 +3,10 @@ import { useOverlayStore } from '../../store';
 import { DraggableWidget } from './DraggableWidget';
 
 export default function LyricsDisplay() {
-  const [lyrics, setLyrics] = useState({ prev: '', current: '' });
+  const [lyrics, setLyrics] = useState({ prev: '', current: '', next: '' });
   const [currentText, setCurrentText] = useState('');
+  const [prevText, setPrevText] = useState('');
+  const [nextText, setNextText] = useState('');
   const [exitClass, setExitClass] = useState(false);
   const [enterClass, setEnterClass] = useState(false);
   const currentLyricRef = useRef('');
@@ -16,12 +18,13 @@ export default function LyricsDisplay() {
 
   useEffect(() => {
     const handler = (e) => {
-      const { prev, current } = e.detail || {};
+      const { prev, current, next } = e.detail || {};
       const newCurrent = current || '';
       const newPrev = prev || '';
+      const newNext = next || '';
 
       if (window.api?.saveNotes) {
-        window.api.saveNotes(`[DISPLAY-LOG] handler received: prev="${newPrev}", current="${newCurrent}"`);
+        window.api.saveNotes(`[DISPLAY-LOG] handler received: prev="${newPrev}", current="${newCurrent}", next="${newNext}"`);
       }
 
       if (currentLyricRef.current !== newCurrent) {
@@ -29,6 +32,8 @@ export default function LyricsDisplay() {
         setExitClass(true);
         setTimeout(() => {
           setCurrentText(newCurrent);
+          setPrevText(newPrev);
+          setNextText(newNext);
           setExitClass(false);
           setEnterClass(true);
           
@@ -37,15 +42,19 @@ export default function LyricsDisplay() {
             setEnterClass(false);
           }, 50);
         }, 200);
+      } else {
+        // If current hasn't changed but prev or next changed (e.g. initial load or skip)
+        setPrevText(newPrev);
+        setNextText(newNext);
       }
       
-      setLyrics({ prev: newPrev, current: newCurrent });
+      setLyrics({ prev: newPrev, current: newCurrent, next: newNext });
     };
     window.addEventListener('lyrics-update', handler);
     return () => window.removeEventListener('lyrics-update', handler);
   }, []);
 
-  const hasLyrics = !!(lyrics.prev || lyrics.current || currentText);
+  const hasLyrics = !!(lyrics.prev || lyrics.current || lyrics.next || currentText);
   const showPlaceholder = !hasLyrics && isMoving;
   const isVisible = hasLyrics || isMoving;
 
@@ -72,7 +81,7 @@ export default function LyricsDisplay() {
           flexDirection: 'column', 
           justifyContent: 'center', 
           alignItems: flexAlign,
-          gap: '6px' 
+          gap: '10px' 
         }}
       >
         {showPlaceholder ? (
@@ -90,7 +99,11 @@ export default function LyricsDisplay() {
           </div>
         ) : (
           <>
-            <div id="lyrics-prev" className="lyrics-line lyrics-prev-line" style={{ textAlign: align }}>{lyrics.prev}</div>
+            {prevText && (
+              <div id="lyrics-prev" className="lyrics-line lyrics-prev-line" style={{ textAlign: align }}>
+                {prevText}
+              </div>
+            )}
             <div 
               id="lyrics-current" 
               className={`lyrics-line lyrics-current-line ${exitClass ? 'lyrics-exit' : ''} ${enterClass ? 'lyrics-enter' : ''}`}
@@ -98,6 +111,11 @@ export default function LyricsDisplay() {
             >
               {currentText}
             </div>
+            {nextText && (
+              <div id="lyrics-next" className="lyrics-line lyrics-next-line" style={{ textAlign: align }}>
+                {nextText}
+              </div>
+            )}
           </>
         )}
       </div>

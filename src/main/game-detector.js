@@ -1,5 +1,9 @@
 const { exec } = require('child_process');
 const https = require('https');
+const { app } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const Jimp = require('jimp');
 
 const STEAM_APP_IDS = {
   'minecraft':    '1672970',
@@ -138,18 +142,88 @@ class GameDetector {
     });
   }
 
+  async upscaleAndCacheImage(url, appId) {
+    try {
+      const cacheDir = path.join(app.getPath('userData'), 'cache', 'game-images');
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
+      const is2x = url.includes('_2x');
+      const cachePath = path.join(cacheDir, is2x ? `${appId}_2x.jpg` : `${appId}_upscaled.jpg`);
+      const fileUrl = 'local-file://' + cachePath.replace(/\\/g, '/');
+
+      if (fs.existsSync(cachePath)) {
+        return fileUrl;
+      }
+
+      console.log(`[GameImage] Downloading game image: ${url}`);
+      const buffer = await new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`Failed to download image: ${res.statusCode}`));
+            return;
+          }
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => resolve(Buffer.concat(chunks)));
+        }).on('error', reject);
+      });
+
+      // If it is already a native 2x high-resolution image, write buffer directly (saves CPU/time)
+      if (url.includes('_2x')) {
+        fs.writeFileSync(cachePath, buffer);
+        console.log(`[GameImage] Success caching native 2x high-res game image ID ${appId}`);
+        return fileUrl;
+      }
+
+      // Read and resize using Jimp (pure JS, non-native dependency) for lower-resolution fallback covers
+      const image = await Jimp.read(buffer);
+      // Upscale 600x900 to 1200x1800 for high quality on 1080p outputs
+      await image
+        .resize(1200, 1800, Jimp.RESIZE_LANCZOS3)
+        .quality(85)
+        .writeAsync(cachePath);
+
+      console.log(`[GameImage] Success upscaling and caching game ID ${appId}`);
+      return fileUrl;
+    } catch (err) {
+      console.error('[GameImage] Caching/upscaling cover art failed, falling back to original url:', err);
+      return url;
+    }
+  }
+
   async fetchGameImage(gameName) {
     const key = gameName.toLowerCase();
     if (this.imageCache[key]) return this.imageCache[key];
 
     const appId = STEAM_APP_IDS[key] || STEAM_APP_IDS[key.replace(/\s+/g,'')];
     if (appId) {
+      // 1. Try native 2x high resolution grid first (1200x1800 px)
+      const url2x = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`;
+      const exists2x = await this.checkUrl(url2x);
+      if (exists2x) {
+        const cached = await this.upscaleAndCacheImage(url2x, appId);
+        this.imageCache[key] = cached;
+        return cached;
+      }
+
+      // 2. Fallback to standard 600x900 grid (and upscale with Jimp)
       const url = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`;
       const exists = await this.checkUrl(url);
-      if (exists) { this.imageCache[key] = url; return url; }
-      const url2 = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
-      const exists2 = await this.checkUrl(url2);
-      if (exists2) { this.imageCache[key] = url2; return url2; }
+      if (exists) {
+        const upscaled = await this.upscaleAndCacheImage(url, appId);
+        this.imageCache[key] = upscaled;
+        return upscaled;
+      }
+
+      // 3. Fallback to header image
+      const urlHeader = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
+      const existsHeader = await this.checkUrl(urlHeader);
+      if (existsHeader) {
+        const upscaled = await this.upscaleAndCacheImage(urlHeader, appId);
+        this.imageCache[key] = upscaled;
+        return upscaled;
+      }
     }
 
     try {
@@ -158,11 +232,33 @@ class GameDetector {
       const items = data?.items;
       if (items?.length) {
         const first = items[0];
+        
+        // Try native 2x first
+        const url2x = `https://cdn.cloudflare.steamstatic.com/steam/apps/${first.id}/library_600x900_2x.jpg`;
+        const exists2x = await this.checkUrl(url2x);
+        if (exists2x) {
+          const cached = await this.upscaleAndCacheImage(url2x, first.id);
+          this.imageCache[key] = cached;
+          return cached;
+        }
+
+        // Try standard grid
         const imgUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${first.id}/library_600x900.jpg`;
         const exists = await this.checkUrl(imgUrl);
-        if (exists) { this.imageCache[key] = imgUrl; return imgUrl; }
-        const imgUrl2 = `https://cdn.cloudflare.steamstatic.com/steam/apps/${first.id}/header.jpg`;
-        this.imageCache[key] = imgUrl2; return imgUrl2;
+        if (exists) {
+          const upscaled = await this.upscaleAndCacheImage(imgUrl, first.id);
+          this.imageCache[key] = upscaled;
+          return upscaled;
+        }
+
+        // Try header
+        const imgUrlHeader = `https://cdn.cloudflare.steamstatic.com/steam/apps/${first.id}/header.jpg`;
+        const existsHeader = await this.checkUrl(imgUrlHeader);
+        if (existsHeader) {
+          const upscaled = await this.upscaleAndCacheImage(imgUrlHeader, first.id);
+          this.imageCache[key] = upscaled;
+          return upscaled;
+        }
       }
     } catch(e) { console.log('[GameImage] Steam search failed:', e.message); }
 

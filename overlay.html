@@ -4,6 +4,310 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Overlay Transparente</title>
+  <style>
+    /* ── Debug console ── */
+    #debug-log-overlay {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.95);
+      color: #00ff00;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #00ff00;
+      z-index: 100000;
+      max-height: 250px;
+      overflow-y: auto;
+      pointer-events: auto;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+      display: none;
+    }
+    #debug-log-overlay h3 {
+      margin: 0 0 8px 0;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #00ff00;
+      font-size: 14px;
+    }
+
+    /* ── 9:16 Vertical Canvas (browser / tunnel mode) ── */
+    /*
+      When loaded in a real browser (not Electron), the body gets the class
+      "remote-mode". This makes the overlay render inside a 9:16 box that
+      auto-scales to fit the available viewport, exactly like OBS browser source.
+      In Electron the class is never added and the overlay stays fullscreen.
+    */
+    body.remote-mode {
+      background: #000 !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    body.remote-mode #root {
+      /* Fixed 9:16 canvas — scaled to fit */
+      position: relative !important;
+      width: 540px;
+      height: 960px;
+      overflow: hidden;
+      transform-origin: top center;
+      /* Scale set dynamically by JS */
+      flex-shrink: 0;
+    }
+
+    /* In remote mode, all fixed/absolute children of #root must be contained */
+    body.remote-mode #root > * {
+      position: absolute;
+    }
+
+    body.remote-mode #debug-log-overlay {
+      /* Keep debug console visible in remote mode */
+      position: absolute;
+      z-index: 100000;
+    }
+  </style>
+  <script>
+    (function() {
+      // Setup debug logger immediately with buffer for early logs
+      const logBuffer = [];
+      window.logDebug = function(msg) {
+        console.log("[OverlayDebug]", msg);
+        const logLine = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        const container = document.getElementById('debug-log-overlay');
+        if (container) {
+          const line = document.createElement('div');
+          line.style.marginBottom = '3px';
+          line.textContent = logLine;
+          container.appendChild(line);
+          container.scrollTop = container.scrollHeight;
+        } else {
+          logBuffer.push(logLine);
+        }
+      };
+
+      // Catch global errors
+      window.onerror = function(msg, url, line, col, error) {
+        window.logDebug(`GLOBAL ERROR: ${msg} at ${url}:${line}:${col}`);
+        const container = document.getElementById('debug-log-overlay');
+        if (container) container.style.display = 'block';
+      };
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const debugMode = urlParams.get('debug') === 'true';
+      const token = urlParams.get('token');
+
+      // ── Detect remote (browser/tunnel) vs local Electron ──
+      // Electron loads the overlay as a file:// or http://localhost, never from
+      // an external hostname. TikTok Live Studio and real browsers load from the
+      // Cloudflare tunnel URL which has an external hostname.
+      const port = parseInt(window.location.port, 10);
+      const isLocalElectron = window.location.protocol === 'file:'
+        || port === 5173
+        || port === 3030
+        || port === 3040
+        || window.location.hostname === 'localhost'
+        || window.location.hostname === '127.0.0.1'
+        || window.location.hostname.startsWith('192.168.')
+        || window.location.hostname.startsWith('10.');
+      
+      const isRemoteBrowser = !isLocalElectron;
+
+      if (isRemoteBrowser) {
+        document.body.classList.add('remote-mode');
+        window.logDebug('Remote browser mode: applying 9:16 vertical canvas scaling.');
+
+        // Scale the 540x960 canvas to fit viewport
+        function applyScale() {
+          const root = document.getElementById('root');
+          if (!root) return;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight || window.screen.height;
+          // Scale to fit either width or height, whichever is more constraining
+          const scaleByWidth  = vw / 540;
+          const scaleByHeight = vh / 960;
+          const scale = Math.min(scaleByWidth, scaleByHeight);
+          root.style.transform = `scale(${scale})`;
+          // Center horizontally when scaled
+          const scaledW = 540 * scale;
+          root.style.marginLeft = Math.max(0, (vw - scaledW) / 2) + 'px';
+          window.logDebug(`Canvas scale: ${scale.toFixed(3)} (vw=${vw} vh=${vh})`);
+        }
+
+        window.addEventListener('DOMContentLoaded', applyScale);
+        window.addEventListener('resize', applyScale);
+        applyScale();
+      }
+
+      // Auto-show debug window if requested and flush buffered logs
+      window.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('debug-log-overlay');
+        if (container) {
+          // Flush buffer
+          logBuffer.forEach(logLine => {
+            const line = document.createElement('div');
+            line.style.marginBottom = '3px';
+            line.textContent = logLine;
+            container.appendChild(line);
+          });
+          container.scrollTop = container.scrollHeight;
+          
+          if (debugMode) {
+            container.style.display = 'block';
+          }
+        }
+      });
+
+      // Determine best socket host and script URL dynamically
+      // Case 1: Vite dev server (port 5173) → redirect to Express on 3030
+      // Case 2: Direct Express load (port 3030) → use relative path
+      // Case 3: Remote tunnel (e.g. trycloudflare.com) → use same origin
+      //
+      // IMPORTANT: We load from /assets/socketio.js, NOT /socket.io/socket.io.js
+      // because Socket.io intercepts ALL /socket.io/* requests at the raw HTTP level
+      // before Express can handle them — causing an empty response on Express 5.
+      let socketHost = '';
+      let scriptUrl = '/assets/socketio.js';
+
+      if (window.location.port === '5173') {
+        window.logDebug("Vite Dev Server detected (port 5173). Connecting to Express server on port 3030.");
+        socketHost = 'http://localhost:3030';
+        scriptUrl = 'http://localhost:3030/assets/socketio.js';
+      } else {
+        // For both direct Express and tunnel, socket host = current origin
+        socketHost = window.location.origin;
+        scriptUrl = window.location.origin + '/assets/socketio.js';
+        window.logDebug(`Remote/Direct mode. Socket host: "${socketHost}"`);
+      }
+
+      window.logDebug(`Loading Socket.io client from: "${scriptUrl}"`);
+
+
+      // CDN fallback URL if local socket.io.js fails
+      const CDN_FALLBACK = 'https://cdn.socket.io/4.8.0/socket.io.min.js';
+
+      function initSocket() {
+        if (!window.io) {
+          window.logDebug("WARNING: socket.io loaded but window.io is undefined.");
+          const container = document.getElementById('debug-log-overlay');
+          if (container) container.style.display = 'block';
+          return;
+        }
+
+        window.logDebug(`Socket.io client loaded. Connecting to "${socketHost}". Token exists: ${!!token}`);
+        
+        // Initialize Socket forcing websocket transport to optimize network and eliminate HTTP polling overhead
+        const socket = io(socketHost, {
+          auth: { token },
+          query: { token },
+          transports: ['websocket']
+        });
+        
+        const listeners = {};
+        
+        socket.onAny((event, ...args) => {
+          window.logDebug(`Socket event received: "${event}"`);
+          let targetEvent = event;
+          // Map config-loaded event from socket to config-updated listener in React
+          if (event === 'config-loaded') {
+            targetEvent = 'config-updated';
+            window.logDebug('Mapped event "config-loaded" to "config-updated"');
+          }
+          
+          if (listeners[targetEvent]) {
+            listeners[targetEvent].forEach(cb => cb(...args));
+          }
+        });
+        
+        socket.on('connect', () => {
+          window.logDebug(`Socket connected successfully! ID: ${socket.id}`);
+          window.dispatchEvent(new CustomEvent('api-connected'));
+          if (!debugMode) {
+            const container = document.getElementById('debug-log-overlay');
+            if (container) container.style.display = 'none';
+          }
+        });
+        
+        socket.on('connect_error', (err) => {
+          window.logDebug(`Socket connection error: ${err.message}`);
+          const container = document.getElementById('debug-log-overlay');
+          if (container) container.style.display = 'block';
+        });
+
+        socket.on('disconnect', (reason) => {
+          window.logDebug(`Socket disconnected. Reason: ${reason}`);
+          const container = document.getElementById('debug-log-overlay');
+          if (container) container.style.display = 'block';
+        });
+        
+        window.api = {
+          getConfig: () => new Promise((resolve) => {
+            window.logDebug('Emitting API request "getConfig"...');
+            socket.emit('api-request', { method: 'getConfig', args: [] }, (res) => {
+              if (res?.success) {
+                window.logDebug(`getConfig success! Accent: ${res.data?.accent}, Theme: ${res.data?.theme}`);
+                resolve(res.data);
+              } else {
+                window.logDebug(`getConfig failed: ${res?.error || 'Unknown error'}`);
+                resolve(null);
+              }
+            });
+          }),
+          getSession: () => new Promise((resolve) => {
+            socket.emit('api-request', { method: 'getSession', args: [] }, (res) => {
+              resolve(res?.success ? res.data : null);
+            });
+          }),
+          saveConfig: (data) => new Promise((resolve) => {
+            window.logDebug('Emitting API request "saveConfig"...');
+            socket.emit('api-request', { method: 'saveConfig', args: [data] }, (res) => {
+              resolve(res?.success ? res.data : null);
+            });
+          }),
+          on: (channel, cb) => {
+            window.logDebug(`React registered listener for channel: "${channel}"`);
+            if (!listeners[channel]) listeners[channel] = [];
+            listeners[channel].push(cb);
+            return cb;
+          },
+          off: (channel, cb) => {
+            window.logDebug(`React removed listener for channel: "${channel}"`);
+            if (listeners[channel]) {
+              listeners[channel] = listeners[channel].filter(x => x !== cb);
+            }
+          }
+        };
+
+        // Dispatch api-ready event for components waiting for window.api
+        window.dispatchEvent(new CustomEvent('api-ready'));
+        window.logDebug('Dispatched "api-ready" event');
+      }
+
+      // Load socket.io client dynamically with CDN fallback
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.onload = initSocket;
+      script.onerror = () => {
+        window.logDebug(`Failed to load socket.io from "${scriptUrl}". Trying CDN fallback...`);
+        const fallbackScript = document.createElement('script');
+        fallbackScript.src = CDN_FALLBACK;
+        fallbackScript.onload = initSocket;
+        fallbackScript.onerror = () => {
+          window.logDebug(`CRITICAL: Both local and CDN socket.io failed to load!`);
+          const container = document.getElementById('debug-log-overlay');
+          if (container) container.style.display = 'block';
+        };
+        document.head.appendChild(fallbackScript);
+      };
+
+      document.head.appendChild(script);
+    })();
+  
+  </script>
 </head>
 <body class="bg-transparent overflow-hidden">
   <div id="root"></div>
