@@ -239,9 +239,6 @@ export default function WinIsland() {
     return <div id="winisland-container" style={{ display: 'none' }} />;
   }
 
-  // Clip width in SVG coords (viewBox=900 wide → pct% of 900)
-  const clipW = (pct / 100) * 900;
-
   return (
     <div id="winisland-container" className="spoti-card-widget">
       {/* Blurred artwork backdrop */}
@@ -249,7 +246,7 @@ export default function WinIsland() {
         <div className="spoti-bg-blur" style={{ backgroundImage: `url(${mediaInfo.art})` }} />
       )}
 
-      {/* Cover art — anchored left, full height */}
+      {/* Cover art — anchored left, nested rounded square */}
       <div className="spoti-cover-wrap">
         {mediaInfo.art ? (
           <img className="spoti-cover" src={mediaInfo.art} alt="" />
@@ -272,43 +269,42 @@ export default function WinIsland() {
           )}
         </div>
 
-        {/* Wave progress */}
-        <div
-          className="spoti-wave-wrap"
-          onMouseDown={handleSeekMouseDown}
-          id="winisland-seekbar-track"
-        >
-          <svg
-            className={`spoti-wave-svg ${!mediaInfo.playing ? 'paused' : ''}`}
-            viewBox="0 0 900 24"
-            preserveAspectRatio="none"
-            style={{ width: '300%', height: '100%', display: 'block' }}
+        {/* Wave progress container */}
+        <div className="spoti-wave-container">
+          <div
+            className="spoti-wave-wrap"
+            onMouseDown={handleSeekMouseDown}
+            id="winisland-seekbar-track"
           >
-            <defs>
-              {/* Clip to progress width (in SVG coords) */}
-              <clipPath id="wave-clip-fg">
-                <rect x="0" y="0" width={clipW} height="24" />
-              </clipPath>
-            </defs>
+            {/* Background wave (dim, full width) */}
+            <div className="spoti-wave-bg">
+              <svg
+                className={`spoti-wave-svg ${!mediaInfo.playing ? 'paused' : ''}`}
+                viewBox="0 0 900 24"
+                preserveAspectRatio="none"
+              >
+                <path d={WAVE_PATH} fill="rgba(255,255,255,0.12)" />
+              </svg>
+            </div>
 
-            {/* Background dim wave (full width) */}
-            <path d={WAVE_PATH} fill="rgba(255,255,255,0.12)" />
-
-            {/* Foreground accent wave (clipped to progress %) */}
-            <path d={WAVE_PATH} fill="var(--accent)" fillOpacity="0.9" clipPath="url(#wave-clip-fg)" />
+            {/* Foreground wave (accent, masked by progress width) */}
+            <div className="spoti-wave-fg" style={{ width: `${pct}%` }}>
+              <svg
+                className={`spoti-wave-svg ${!mediaInfo.playing ? 'paused' : ''}`}
+                viewBox="0 0 900 24"
+                preserveAspectRatio="none"
+              >
+                <path d={WAVE_PATH} fill="var(--accent)" fillOpacity="0.9" />
+              </svg>
+            </div>
 
             {/* Playhead dot */}
             {pct > 0 && pct < 100 && (
-              <circle
-                cx={clipW}
-                cy="12"
-                r="4"
-                fill="var(--accent)"
-              />
+              <div className="spoti-wave-dot" style={{ left: `${pct}%` }} />
             )}
-          </svg>
+          </div>
 
-          {/* Time labels */}
+          {/* Time labels below wave progress */}
           <div className="spoti-wave-time">
             <span>{formatTime(currentSeconds)}</span>
             {mediaInfo.duration > 0 ? (

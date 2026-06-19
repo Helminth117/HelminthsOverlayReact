@@ -14,17 +14,18 @@
 }
 
 /* ── Contenedor pill ────────────────────────── */
+/* ── Contenedor pill ────────────────────────── */
 .spoti-card-widget {
   position: relative;
   width: 340px !important;
   height: 88px !important;
-  border-radius: 10px !important;
-  background: rgba(14, 14, 14, 0.88) !important;
+  border-radius: 16px !important;
+  background: rgba(13, 13, 13, 0.94) !important;
   backdrop-filter: blur(18px) saturate(200%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(200%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.6),
+    0 8px 32px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
   overflow: hidden !important;
   font-family: 'Outfit', 'Inter', sans-serif;
@@ -39,10 +40,10 @@
 }
 
 .spoti-card-widget:hover {
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
   box-shadow:
-    0 6px 28px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(var(--accent-rgb, 139 92 246), 0.15) !important;
+    0 10px 36px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(var(--accent-rgb, 139 92 246), 0.2) !important;
 }
 
 /* ── Desenfoque de fondo desde la carátula ──── */
@@ -56,15 +57,17 @@
   pointer-events: none;
 }
 
-/* ── Carátula cuadrada ──────────────────────── */
+/* ── Carátula cuadrada flotante ──────────────── */
 .spoti-cover-wrap {
   position: relative;
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  height: 64px;
+  margin-left: 12px;
   flex-shrink: 0;
   z-index: 1;
   overflow: hidden;
-  border-radius: 9px 0 0 9px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .spoti-cover {
@@ -73,12 +76,12 @@
   object-fit: cover;
   object-position: center;
   display: block;
-  transform: scale(1.15);
+  transform: scale(1.15); /* zoom to avoid black borders on album arts */
   transition: transform 0.4s ease;
 }
 
 .spoti-card-widget:hover .spoti-cover {
-  transform: scale(1.2);
+  transform: scale(1.22);
 }
 
 .spoti-cover-placeholder {
@@ -98,119 +101,85 @@
   justify-content: center;
   flex: 1;
   min-width: 0;
-  padding: 8px 12px 8px 12px;
+  padding: 10px 14px 10px 12px;
   z-index: 1;
-  gap: 5px;
+  gap: 4px;
 }
-
-/* info ya no tiene sub-layouts complejos */
-.spoti-info { display: contents; }
 
 .spoti-text-wrap {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   overflow: hidden;
+  width: 100%;
 }
 
 .spoti-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   line-height: 1.2;
   color: #ffffff;
   letter-spacing: -0.2px;
-
-  /* Marquee para títulos largos */
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Marquee animation when title is long — add class via JS if needed */
-.spoti-title.marquee {
-  text-overflow: clip;
-}
-.spoti-title.marquee .marquee-inner {
-  display: inline-block;
-  animation: marquee-scroll 12s linear infinite;
-  padding-right: 40px;
 }
 
 .spoti-artist {
   font-size: 11px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+  width: 100%;
 }
 
 .spoti-requester {
-  font-size: 9.5px;
-  color: rgba(var(--accent-rgb, 139 92 246), 0.9);
+  font-size: 9px;
+  color: rgba(var(--accent-rgb, 139 92 246), 0.95);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 600;
   letter-spacing: 0.03em;
-}
-
-/* ── Visualizador de barras (SpotiWidget style) */
-.spoti-visualizer {
-  display: flex;
-  align-items: flex-end;
-  gap: 2.5px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
-.spoti-bar {
-  width: 3px;
-  background: rgba(var(--accent-rgb, 139 92 246), 0.85);
-  border-radius: 1.5px 1.5px 0 0;
-  transform-origin: bottom center;
-  transition: height 0.1s ease;
-}
-
-/* Animated when playing — heights driven by JS (AudioAnalyser) */
-/* Fallback idle animation when not connected to audio */
-.spoti-bar.idle:nth-child(1)  { animation: bar-bounce 1.1s ease-in-out infinite 0.0s; height: 12px; }
-.spoti-bar.idle:nth-child(2)  { animation: bar-bounce 1.1s ease-in-out infinite 0.1s; height: 8px; }
-.spoti-bar.idle:nth-child(3)  { animation: bar-bounce 1.1s ease-in-out infinite 0.2s; height: 14px; }
-.spoti-bar.idle:nth-child(4)  { animation: bar-bounce 1.1s ease-in-out infinite 0.15s; height: 10px; }
-.spoti-bar.idle:nth-child(5)  { animation: bar-bounce 1.1s ease-in-out infinite 0.05s; height: 16px; }
-.spoti-bar.idle:nth-child(6)  { animation: bar-bounce 1.1s ease-in-out infinite 0.25s; height: 9px; }
-.spoti-bar.idle:nth-child(7)  { animation: bar-bounce 1.1s ease-in-out infinite 0.10s; height: 13px; }
-.spoti-bar.idle:nth-child(8)  { animation: bar-bounce 1.1s ease-in-out infinite 0.20s; height: 7px; }
-.spoti-bar.idle:nth-child(9)  { animation: bar-bounce 1.1s ease-in-out infinite 0.30s; height: 15px; }
-.spoti-bar.idle:nth-child(10) { animation: bar-bounce 1.1s ease-in-out infinite 0.08s; height: 11px; }
-.spoti-bar.idle:nth-child(11) { animation: bar-bounce 1.1s ease-in-out infinite 0.18s; height: 6px; }
-.spoti-bar.idle:nth-child(12) { animation: bar-bounce 1.1s ease-in-out infinite 0.28s; height: 14px; }
-.spoti-bar.idle:nth-child(13) { animation: bar-bounce 1.1s ease-in-out infinite 0.12s; height: 10px; }
-.spoti-bar.idle:nth-child(14) { animation: bar-bounce 1.1s ease-in-out infinite 0.22s; height: 16px; }
-.spoti-bar.idle:nth-child(15) { animation: bar-bounce 1.1s ease-in-out infinite 0.03s; height: 8px; }
-.spoti-bar.idle:nth-child(16) { animation: bar-bounce 1.1s ease-in-out infinite 0.17s; height: 12px; }
-.spoti-bar.idle:nth-child(17) { animation: bar-bounce 1.1s ease-in-out infinite 0.07s; height: 5px; }
-.spoti-bar.idle:nth-child(18) { animation: bar-bounce 1.1s ease-in-out infinite 0.23s; height: 13px; }
-.spoti-bar.idle:nth-child(19) { animation: bar-bounce 1.1s ease-in-out infinite 0.14s; height: 9px; }
-.spoti-bar.idle:nth-child(20) { animation: bar-bounce 1.1s ease-in-out infinite 0.32s; height: 15px; }
-
-/* Paused = barras planas */
-.spoti-bar.paused {
-  animation: none !important;
-  height: 3px !important;
-  opacity: 0.35;
+  width: 100%;
+  margin-top: 1px;
 }
 
 /* ── Wave progress ──────────────────────────── */
+.spoti-wave-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 2px;
+}
+
 .spoti-wave-wrap {
   position: relative;
   width: 100%;
-  height: 28px;
-  overflow: hidden;
-  border-radius: 4px;
+  height: 16px;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+.spoti-wave-bg, .spoti-wave-fg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+}
+
+.spoti-wave-bg {
+  right: 0;
+}
+
+.spoti-wave-fg {
+  border-right: 1px solid transparent;
 }
 
 @keyframes wave-flow {
@@ -222,6 +191,9 @@
   position: absolute;
   top: 0;
   left: 0;
+  width: 300%;
+  height: 100%;
+  display: block;
   animation: wave-flow 5s linear infinite;
   will-change: transform;
 }
@@ -230,18 +202,29 @@
   animation-play-state: paused;
 }
 
-.spoti-wave-time {
+.spoti-wave-dot {
   position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #a78bfa);
+  box-shadow: 0 0 6px var(--accent, #a78bfa);
+  pointer-events: none;
+  z-index: 2;
+  transition: left 0.1s linear; /* smooth playhead movement */
+}
+
+.spoti-wave-time {
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 8.5px;
   color: rgba(255, 255, 255, 0.4);
   font-weight: 500;
   pointer-events: none;
   line-height: 1;
+  margin-top: 3px;
 }
 
 .spoti-live-badge {
@@ -254,11 +237,20 @@
 .spoti-card-widget.compact {
   width: 280px !important;
   height: 74px !important;
+  border-radius: 12px !important;
 }
 .spoti-card-widget.compact .spoti-cover-wrap {
-  width: 74px;
-  height: 74px;
+  width: 50px;
+  height: 50px;
+  margin-left: 10px;
+  border-radius: 8px;
+}
+.spoti-card-widget.compact .spoti-content {
+  padding: 8px 10px;
+  gap: 2px;
 }
 .spoti-card-widget.compact .spoti-title { font-size: 12px; }
 .spoti-card-widget.compact .spoti-artist { font-size: 10px; }
-.spoti-card-widget.compact .spoti-wave-wrap { height: 22px; }
+.spoti-card-widget.compact .spoti-wave-wrap { height: 12px; }
+.spoti-card-widget.compact .spoti-wave-dot { width: 6px; height: 6px; }
+.spoti-card-widget.compact .spoti-wave-time { font-size: 8px; margin-top: 1px; }
