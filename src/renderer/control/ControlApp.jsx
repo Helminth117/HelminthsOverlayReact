@@ -4,6 +4,7 @@ import TikTokManager from './components/TikTokManager';
 import ObjectivesManager from './components/ObjectivesManager';
 import AlertsTimerManager from './components/AlertsTimerManager';
 import GeneralSettingsManager from './components/GeneralSettingsManager';
+import AppearanceSettingsManager from './components/AppearanceSettingsManager';
 import HistoryManager from './components/HistoryManager';
 
 const PRIO_ORDER = { alto: 0, medio: 1, bajo: 2, none: 3 };
@@ -420,6 +421,7 @@ export default function ControlApp() {
       <main className={`tab-view ${activeTab === 'overlay' ? 'active' : ''}`}>
         <nav className="sub-tabs">
           <button className={`sub-tab-btn ${activeSubTab === 'general' ? 'active' : ''}`} onClick={() => setActiveSubTab('general')}>General</button>
+          <button className={`sub-tab-btn ${activeSubTab === 'apariencia' ? 'active' : ''}`} onClick={() => setActiveSubTab('apariencia')}>Apariencia</button>
           <button className={`sub-tab-btn ${activeSubTab === 'juegos' ? 'active' : ''}`} onClick={() => setActiveSubTab('juegos')}>Videojuegos</button>
           <button className={`sub-tab-btn ${activeSubTab === 'alertas' ? 'active' : ''}`} onClick={() => setActiveSubTab('alertas')}>Alertas & Reloj</button>
         </nav>
@@ -428,9 +430,15 @@ export default function ControlApp() {
           activeSubTab={activeSubTab}
           config={config}
           saveConfig={saveConfig}
+          WIDGET_LABELS={WIDGET_LABELS}
+        />
+
+        <AppearanceSettingsManager
+          activeSubTab={activeSubTab}
+          config={config}
+          saveConfig={saveConfig}
           audioDevices={audioDevices}
           refreshAudioDevices={refreshAudioDevices}
-          WIDGET_LABELS={WIDGET_LABELS}
         />
 
         <GameProfilesCard
@@ -446,7 +454,6 @@ export default function ControlApp() {
           activeSubTab={activeSubTab}
           config={config}
           saveConfig={saveConfig}
-          queueData={queueData}
           timerSeconds={timerSeconds}
           timerMode={timerMode}
           timerRunning={timerRunning}
@@ -494,6 +501,7 @@ export default function ControlApp() {
         isPollActive={isPollActive}
         setIsPollActive={setIsPollActive}
         chatHistory={chatHistory}
+        queueData={queueData}
       />
     </>
   );

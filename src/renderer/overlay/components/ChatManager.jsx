@@ -8,6 +8,11 @@ export default function ChatManager() {
   const [pinned, setPinned] = useState(null);
   const config = useOverlayStore(s => s.config) || {};
 
+  // Auto-visibility: show chat only on Just Chatting, hide when a game is running
+  const gameName = config.gameName || 'Just Chatting';
+  const isJustChatting = gameName.trim().toLowerCase() === 'just chatting';
+  const chatVisible = config.autoHideChatOnGame !== false ? isJustChatting : true;
+
   const configRef = useRef(config);
   const userSongRequestsRef = useRef({});
   const messagesEndRef = useRef(null);
@@ -139,6 +144,8 @@ export default function ChatManager() {
       window.api.off('highlight-chat', highlightHandler);
     };
   }, []);
+
+  if (!chatVisible) return null;
 
   return (
     <>

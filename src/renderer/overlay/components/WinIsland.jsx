@@ -209,10 +209,38 @@ export default function WinIsland() {
     }
   };
 
+
+  // ── Wave path: 3x wide for seamless loop (18 periods × 150 units = 2700)
+  // viewBox 0 0 900 24 | cy=12 | amp peaks at 0 and 24
+  const WAVE_PATH = [
+    'M 0 12',
+    'C 37.5 0,75 0,75 12 C 112.5 24,150 24,150 12',
+    'C 187.5 0,225 0,225 12 C 262.5 24,300 24,300 12',
+    'C 337.5 0,375 0,375 12 C 412.5 24,450 24,450 12',
+    'C 487.5 0,525 0,525 12 C 562.5 24,600 24,600 12',
+    'C 637.5 0,675 0,675 12 C 712.5 24,750 24,750 12',
+    'C 787.5 0,825 0,825 12 C 862.5 24,900 24,900 12',
+    'C 937.5 0,975 0,975 12 C 1012.5 24,1050 24,1050 12',
+    'C 1087.5 0,1125 0,1125 12 C 1162.5 24,1200 24,1200 12',
+    'C 1237.5 0,1275 0,1275 12 C 1312.5 24,1350 24,1350 12',
+    'C 1387.5 0,1425 0,1425 12 C 1462.5 24,1500 24,1500 12',
+    'C 1537.5 0,1575 0,1575 12 C 1612.5 24,1650 24,1650 12',
+    'C 1687.5 0,1725 0,1725 12 C 1762.5 24,1800 24,1800 12',
+    'C 1837.5 0,1875 0,1875 12 C 1912.5 24,1950 24,1950 12',
+    'C 1987.5 0,2025 0,2025 12 C 2062.5 24,2100 24,2100 12',
+    'C 2137.5 0,2175 0,2175 12 C 2212.5 24,2250 24,2250 12',
+    'C 2287.5 0,2325 0,2325 12 C 2362.5 24,2400 24,2400 12',
+    'C 2437.5 0,2475 0,2475 12 C 2512.5 24,2550 24,2550 12',
+    'C 2587.5 0,2625 0,2625 12 C 2662.5 24,2700 24,2700 12',
+  ].join(' ');
+
   // Hide the widget completely if no media is loaded/playing
   if (!mediaInfo.title) {
     return <div id="winisland-container" style={{ display: 'none' }} />;
   }
+
+  // Clip width in SVG coords (viewBox=900 wide → pct% of 900)
+  const clipW = (pct / 100) * 900;
 
   return (
     <div id="winisland-container" className="spoti-card-widget">
@@ -220,51 +248,75 @@ export default function WinIsland() {
       {mediaInfo.art && (
         <div className="spoti-bg-blur" style={{ backgroundImage: `url(${mediaInfo.art})` }} />
       )}
-      
+
+      {/* Cover art — anchored left, full height */}
+      <div className="spoti-cover-wrap">
+        {mediaInfo.art ? (
+          <img className="spoti-cover" src={mediaInfo.art} alt="" />
+        ) : (
+          <div className="spoti-cover-placeholder">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26">
+              <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Center: title + artist + wave progress */}
       <div className="spoti-content">
-        <div className="spoti-cover-wrap">
-          <img className="spoti-cover" src={mediaInfo.art || undefined} alt="" style={{ display: mediaInfo.art ? 'block' : 'none' }} />
-          {!mediaInfo.art && (
-            <div className="spoti-cover-placeholder">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm1 15.5h-2v-2h2v2zm0-4h-2v-6h2v6z"/></svg>
-            </div>
+        <div className="spoti-text-wrap">
+          <span className="spoti-title">{mediaInfo.title}</span>
+          <span className="spoti-artist">{mediaInfo.artist}</span>
+          {mediaInfo.requester && (
+            <span className="spoti-requester">{mediaInfo.requester}</span>
           )}
         </div>
-        
-        <div className="spoti-info">
-          <div className="spoti-text-wrap">
-            <span className="spoti-title">{mediaInfo.title}</span>
-            <span className="spoti-artist">{mediaInfo.artist}</span>
-            {mediaInfo.requester && (
-              <span className="spoti-requester">{mediaInfo.requester}</span>
+
+        {/* Wave progress */}
+        <div
+          className="spoti-wave-wrap"
+          onMouseDown={handleSeekMouseDown}
+          id="winisland-seekbar-track"
+        >
+          <svg
+            className={`spoti-wave-svg ${!mediaInfo.playing ? 'paused' : ''}`}
+            viewBox="0 0 900 24"
+            preserveAspectRatio="none"
+            style={{ width: '300%', height: '100%', display: 'block' }}
+          >
+            <defs>
+              {/* Clip to progress width (in SVG coords) */}
+              <clipPath id="wave-clip-fg">
+                <rect x="0" y="0" width={clipW} height="24" />
+              </clipPath>
+            </defs>
+
+            {/* Background dim wave (full width) */}
+            <path d={WAVE_PATH} fill="rgba(255,255,255,0.12)" />
+
+            {/* Foreground accent wave (clipped to progress %) */}
+            <path d={WAVE_PATH} fill="var(--accent)" fillOpacity="0.9" clipPath="url(#wave-clip-fg)" />
+
+            {/* Playhead dot */}
+            {pct > 0 && pct < 100 && (
+              <circle
+                cx={clipW}
+                cy="12"
+                r="4"
+                fill="var(--accent)"
+              />
+            )}
+          </svg>
+
+          {/* Time labels */}
+          <div className="spoti-wave-time">
+            <span>{formatTime(currentSeconds)}</span>
+            {mediaInfo.duration > 0 ? (
+              <span>{formatTime(mediaInfo.duration)}</span>
+            ) : (
+              <span className="spoti-live-badge">LIVE</span>
             )}
           </div>
-          
-          <div className="spoti-controls">
-            <button className="spoti-btn" onClick={() => { if (window.api?.ytSkip) window.api.ytSkip(); }}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
-            </button>
-            <button className="spoti-btn spoti-btn-play" onClick={handlePlayPause}>
-              {mediaInfo.playing ? (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>
-              )}
-            </button>
-            <button className="spoti-btn" onClick={() => { if (window.api?.ytSkip) window.api.ytSkip(); }}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <div className="spoti-progress-wrap">
-        <div id="winisland-seekbar-track" className="spoti-seekbar" onMouseDown={handleSeekMouseDown}>
-          <div id="winisland-seekbar-fill" className="spoti-seekbar-fill" style={{ width: `${pct}%` }} />
-        </div>
-        <div className="spoti-time">
-          <span>{formatTime(currentSeconds)}</span>
-          <span>{mediaInfo.duration > 0 ? formatTime(mediaInfo.duration) : 'LIVE'}</span>
         </div>
       </div>
     </div>

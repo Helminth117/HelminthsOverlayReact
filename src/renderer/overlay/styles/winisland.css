@@ -1,83 +1,110 @@
+/* ═══════════════════════════════════════════════
+   SpotiWidget Style — inspirado en la referencia
+   Pill horizontal oscuro con carátula + visualizador
+   ═══════════════════════════════════════════════ */
+
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes bar-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1.0); }
+}
+
+/* ── Contenedor pill ────────────────────────── */
 .spoti-card-widget {
   position: relative;
-  width: 320px !important;
-  height: 125px !important;
-  border-radius: 16px !important;
-  background: rgba(18, 18, 18, 0.7) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+  width: 340px !important;
+  height: 88px !important;
+  border-radius: 10px !important;
+  background: rgba(14, 14, 14, 0.88) !important;
+  backdrop-filter: blur(18px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
   overflow: hidden !important;
   font-family: 'Outfit', 'Inter', sans-serif;
   color: #ffffff;
   display: flex;
-  flex-direction: column;
-  padding: 12px;
+  flex-direction: row;
+  align-items: center;
+  padding: 0;
   box-sizing: border-box;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  user-select: none;
 }
 
 .spoti-card-widget:hover {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 15px rgba(var(--accent-rgb), 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 6px 28px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(var(--accent-rgb, 139 92 246), 0.15) !important;
 }
 
+/* ── Desenfoque de fondo desde la carátula ──── */
 .spoti-bg-blur {
   position: absolute;
-  inset: -20px;
+  inset: -30px;
   background-size: cover;
   background-position: center;
-  filter: blur(24px) opacity(0.35);
+  filter: blur(30px) opacity(0.18) saturate(160%);
   z-index: 0;
   pointer-events: none;
-  transform: scale(1.1);
 }
 
-.spoti-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  z-index: 1;
-  overflow: hidden;
-}
-
+/* ── Carátula cuadrada ──────────────────────── */
 .spoti-cover-wrap {
   position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 10px;
-  overflow: hidden;
+  width: 88px;
+  height: 88px;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.08);
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 9px 0 0 9px;
 }
 
 .spoti-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
+  display: block;
+  transform: scale(1.15);
+  transition: transform 0.4s ease;
+}
+
+.spoti-card-widget:hover .spoti-cover {
+  transform: scale(1.2);
 }
 
 .spoti-cover-placeholder {
   width: 100%;
   height: 100%;
-  background: #282828;
+  background: #1a1a1a;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #b3b3b3;
+  color: #555;
 }
 
-.spoti-info {
+/* ── Bloque central: texto + visualizador ───── */
+.spoti-content {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   flex: 1;
-  overflow: hidden;
-  justify-content: space-between;
-  height: 100%;
-  padding: 2px 0;
+  min-width: 0;
+  padding: 8px 12px 8px 12px;
+  z-index: 1;
+  gap: 5px;
 }
+
+/* info ya no tiene sub-layouts complejos */
+.spoti-info { display: contents; }
 
 .spoti-text-wrap {
   display: flex;
@@ -86,102 +113,152 @@
 }
 
 .spoti-title {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.2;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+
+  /* Marquee para títulos largos */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #ffffff;
-  letter-spacing: -0.3px;
+}
+
+/* Marquee animation when title is long — add class via JS if needed */
+.spoti-title.marquee {
+  text-overflow: clip;
+}
+.spoti-title.marquee .marquee-inner {
+  display: inline-block;
+  animation: marquee-scroll 12s linear infinite;
+  padding-right: 40px;
 }
 
 .spoti-artist {
   font-size: 11px;
-  color: #b3b3b3;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  line-height: 1.3;
 }
 
 .spoti-requester {
-  font-size: 9px;
-  color: var(--accent);
+  font-size: 9.5px;
+  color: rgba(var(--accent-rgb, 139 92 246), 0.9);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03em;
 }
 
-.spoti-controls {
+/* ── Visualizador de barras (SpotiWidget style) */
+.spoti-visualizer {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 4px;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
-.spoti-btn {
-  background: transparent;
-  border: none;
-  color: #b3b3b3;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s, transform 0.1s;
+.spoti-bar {
+  width: 3px;
+  background: rgba(var(--accent-rgb, 139 92 246), 0.85);
+  border-radius: 1.5px 1.5px 0 0;
+  transform-origin: bottom center;
+  transition: height 0.1s ease;
 }
 
-.spoti-btn:hover {
-  color: #ffffff;
-  transform: scale(1.08);
+/* Animated when playing — heights driven by JS (AudioAnalyser) */
+/* Fallback idle animation when not connected to audio */
+.spoti-bar.idle:nth-child(1)  { animation: bar-bounce 1.1s ease-in-out infinite 0.0s; height: 12px; }
+.spoti-bar.idle:nth-child(2)  { animation: bar-bounce 1.1s ease-in-out infinite 0.1s; height: 8px; }
+.spoti-bar.idle:nth-child(3)  { animation: bar-bounce 1.1s ease-in-out infinite 0.2s; height: 14px; }
+.spoti-bar.idle:nth-child(4)  { animation: bar-bounce 1.1s ease-in-out infinite 0.15s; height: 10px; }
+.spoti-bar.idle:nth-child(5)  { animation: bar-bounce 1.1s ease-in-out infinite 0.05s; height: 16px; }
+.spoti-bar.idle:nth-child(6)  { animation: bar-bounce 1.1s ease-in-out infinite 0.25s; height: 9px; }
+.spoti-bar.idle:nth-child(7)  { animation: bar-bounce 1.1s ease-in-out infinite 0.10s; height: 13px; }
+.spoti-bar.idle:nth-child(8)  { animation: bar-bounce 1.1s ease-in-out infinite 0.20s; height: 7px; }
+.spoti-bar.idle:nth-child(9)  { animation: bar-bounce 1.1s ease-in-out infinite 0.30s; height: 15px; }
+.spoti-bar.idle:nth-child(10) { animation: bar-bounce 1.1s ease-in-out infinite 0.08s; height: 11px; }
+.spoti-bar.idle:nth-child(11) { animation: bar-bounce 1.1s ease-in-out infinite 0.18s; height: 6px; }
+.spoti-bar.idle:nth-child(12) { animation: bar-bounce 1.1s ease-in-out infinite 0.28s; height: 14px; }
+.spoti-bar.idle:nth-child(13) { animation: bar-bounce 1.1s ease-in-out infinite 0.12s; height: 10px; }
+.spoti-bar.idle:nth-child(14) { animation: bar-bounce 1.1s ease-in-out infinite 0.22s; height: 16px; }
+.spoti-bar.idle:nth-child(15) { animation: bar-bounce 1.1s ease-in-out infinite 0.03s; height: 8px; }
+.spoti-bar.idle:nth-child(16) { animation: bar-bounce 1.1s ease-in-out infinite 0.17s; height: 12px; }
+.spoti-bar.idle:nth-child(17) { animation: bar-bounce 1.1s ease-in-out infinite 0.07s; height: 5px; }
+.spoti-bar.idle:nth-child(18) { animation: bar-bounce 1.1s ease-in-out infinite 0.23s; height: 13px; }
+.spoti-bar.idle:nth-child(19) { animation: bar-bounce 1.1s ease-in-out infinite 0.14s; height: 9px; }
+.spoti-bar.idle:nth-child(20) { animation: bar-bounce 1.1s ease-in-out infinite 0.32s; height: 15px; }
+
+/* Paused = barras planas */
+.spoti-bar.paused {
+  animation: none !important;
+  height: 3px !important;
+  opacity: 0.35;
 }
 
-.spoti-btn-play {
-  color: #ffffff;
-  background: rgba(255,255,255,0.1);
-  border-radius: 50%;
-  padding: 6px;
-}
-
-.spoti-btn-play:hover {
-  background: rgba(255,255,255,0.2);
-  transform: scale(1.1);
-}
-
-.spoti-progress-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 1;
-  margin-top: 8px;
-}
-
-.spoti-seekbar {
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
+/* ── Wave progress ──────────────────────────── */
+.spoti-wave-wrap {
   position: relative;
-  cursor: pointer;
+  width: 100%;
+  height: 28px;
   overflow: hidden;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.spoti-seekbar-fill {
+@keyframes wave-flow {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-33.3333%); } /* one full visual width = seamless */
+}
+
+.spoti-wave-svg {
   position: absolute;
-  top: 0; left: 0; bottom: 0;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: background 0.3s ease;
+  top: 0;
+  left: 0;
+  animation: wave-flow 5s linear infinite;
+  will-change: transform;
 }
 
-.spoti-time {
+.spoti-wave-svg.paused {
+  animation-play-state: paused;
+}
+
+.spoti-wave-time {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
-  color: #a7a7a7;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.4);
   font-weight: 500;
+  pointer-events: none;
+  line-height: 1;
 }
+
+.spoti-live-badge {
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* ── Compact variant ─────────────────────────── */
+.spoti-card-widget.compact {
+  width: 280px !important;
+  height: 74px !important;
+}
+.spoti-card-widget.compact .spoti-cover-wrap {
+  width: 74px;
+  height: 74px;
+}
+.spoti-card-widget.compact .spoti-title { font-size: 12px; }
+.spoti-card-widget.compact .spoti-artist { font-size: 10px; }
+.spoti-card-widget.compact .spoti-wave-wrap { height: 22px; }
