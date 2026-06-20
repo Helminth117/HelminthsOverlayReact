@@ -288,6 +288,7 @@ function registerIpcHandlers(tiktokService, gameDetector) {
   ipcMain.on('yt-resume', () => { console.log('[Main] RUTA: yt-resume recibido -> broadcast al overlay'); broadcast('yt-resume'); });
   ipcMain.on('yt-stop', () => { console.log('[Main] RUTA: yt-stop recibido -> broadcast al overlay'); broadcast('yt-stop'); });
   ipcMain.on('yt-skip', () => { console.log('[Main] RUTA: yt-skip recibido -> broadcast al overlay'); broadcast('yt-skip'); });
+  ipcMain.on('yt-remove-song', (_e, index) => { console.log('[Main] RUTA: yt-remove-song recibido -> broadcast al overlay', index); broadcast('yt-remove-song', index); });
 
   ipcMain.on('queue-updated', (_e, queue) => broadcast('queue-updated', queue));
 
@@ -601,6 +602,7 @@ function createRpcHandler(tiktokService, gameDetector) {
         case 'ytStop': { broadcast('yt-stop'); return true; }
         case 'ytSkip': { broadcast('yt-skip'); return true; }
         case 'ytSetVolume': { broadcast('yt-set-volume', args[0]); return true; }
+        case 'ytRemoveSong': { broadcast('yt-remove-song', args[0]); return true; }
         case 'searchYoutube': return await searchYoutubeHelper(args[0]);
         case 'sendQueueUpdate': { broadcast('queue-updated', args[0]); return true; }
         default: return null;

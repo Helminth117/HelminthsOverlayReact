@@ -510,10 +510,19 @@ export function useSongManager() {
       }
     };
 
+    const handlerYtRemoveSong = (idx) => {
+      console.log('[Cola] Solicitud para eliminar canción en índice:', idx);
+      if (idx !== undefined && idx !== null && idx >= 0 && idx < songQueue.current.length) {
+        songQueue.current.splice(idx, 1);
+        broadcastQueue();
+      }
+    };
+
     const ipcPause = window.api.on('yt-pause', handlerYtPause);
     const ipcResume = window.api.on('yt-resume', handlerYtResume);
     const ipcStop = window.api.on('yt-stop', handlerYtStop);
     const ipcSkip = window.api.on('yt-skip', handlerYtSkip);
+    const ipcRemoveSong = window.api.on('yt-remove-song', handlerYtRemoveSong);
     const ipcEnded = window.api.on('yt-ended', handlerYtEnded);
     const ipcTime = window.api.on('yt-time', handlerYtTime);
     const ipcConfig = window.api.on('config-updated', handlerConfigUpdated);
@@ -559,6 +568,7 @@ export function useSongManager() {
       window.api.off('yt-resume', ipcResume);
       window.api.off('yt-stop', ipcStop);
       window.api.off('yt-skip', ipcSkip);
+      window.api.off('yt-remove-song', ipcRemoveSong);
       window.api.off('yt-ended', ipcEnded);
       window.api.off('yt-time', ipcTime);
       window.api.off('config-updated', ipcConfig);

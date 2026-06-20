@@ -38,7 +38,7 @@ contextBridge.exposeInMainWorld('api', {
     const allowed = [
       'session-updated', 'config-updated', 'tiktok-stats', 'tiktok-like',
       'item-completed', 'timer-tick', 'stream-alert', 'game-detected', 'tiktok-chat', 'media-updated', 'auto-toggle-social', 'play-soundboard', 'yt-ended', 'yt-time', 'highlight-chat',
-      'yt-pause', 'yt-resume', 'yt-stop', 'yt-skip',
+      'yt-pause', 'yt-resume', 'yt-stop', 'yt-skip', 'yt-remove-song',
       'queue-updated', 'move-mode', 'pin-message', 'tunnel-status'
     ];
     if (allowed.includes(channel)) {
@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('api', {
   ytResume: () => ipcRenderer.send('yt-resume'),
   ytSetVolume: (volume) => ipcRenderer.send('yt-set-volume', volume),
   ytSkip: () => ipcRenderer.send('yt-skip'),
+  ytRemoveSong: (index) => ipcRenderer.send('yt-remove-song', index),
   sendQueueUpdate: (queue) => ipcRenderer.send('queue-updated', queue),
 
   // ── YouTube Audio Stream (ad-free) ──

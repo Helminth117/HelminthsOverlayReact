@@ -192,6 +192,18 @@ export default function LiveDashboard({
                         <span style={{ color: 'var(--accent)', fontWeight: 'bold', minWidth: 24 }}>{idx + 1}.</span>
                         <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title || item.query || 'Desconocido'}</span>
                         <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>@{item.user || '?'}</span>
+                        <button 
+                          className="btn btn-danger" 
+                          style={{ padding: '2px 6px', fontSize: 10, height: 'auto', lineHeight: 1 }} 
+                          onClick={() => {
+                            if (window.api?.ytRemoveSong) {
+                              window.api.ytRemoveSong(idx);
+                            }
+                          }}
+                          title="Eliminar de la cola"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     ))}
                   </>
