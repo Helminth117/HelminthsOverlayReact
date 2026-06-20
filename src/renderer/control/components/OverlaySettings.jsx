@@ -312,7 +312,10 @@ export default function OverlaySettings({
 
           {/* Chat Bot messages */}
           <div className="card">
-            <h2>🤖 Bot del Chat (Overlay)</h2>
+            <div className="flex items-center justify-between mb-sm">
+              <h2 style={{ marginBottom: 0 }}>🤖 Bot del Chat (Overlay)</h2>
+              <button className={`toggle ${config.enableBot ? 'on' : ''}`} onClick={() => saveConfig({ enableBot: !config.enableBot })}></button>
+            </div>
             <p className="text-sm text-secondary mb-xs">El bot enviará mensajes automáticos en el chat visual de la pantalla.</p>
             <div className="flex items-center justify-between mb-sm">
               <span className="text-sm">Intervalo Automático (Minutos)</span>
