@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function uid() {
   return 'x' + Date.now() + Math.random().toString(36).substr(2, 9);
@@ -34,6 +34,46 @@ export default function OverlaySettings({
 }) {
   const [activeSubTab, setActiveSubTab] = useState('widgets');
   const [widgetOptsOpen, setWidgetOptsOpen] = useState({});
+  const [voices, setVoices] = useState([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      const updateVoices = () => {
+        const all = window.speechSynthesis.getVoices();
+        setVoices(all);
+      };
+      updateVoices();
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, []);
+
+  const testVoiceLocal = () => {
+    const customText = document.getElementById('custom-tts-test-input')?.value?.trim();
+    const prefix = config.chatTtsPrefix || '.';
+    const msgText = customText ? `${prefix}${customText}` : `${prefix}Hola, probando la voz del chat!`;
+    
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(customText || 'Hola, probando la voz del chat!');
+      u.lang = 'es-ES';
+      if (config.ttsVoiceURI) {
+        const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === config.ttsVoiceURI);
+        if (selectedVoice) u.voice = selectedVoice;
+      }
+      u.volume = config.volTts !== undefined ? config.volTts : 1.0;
+      u.rate = config.ttsRate !== undefined ? config.ttsRate : 1.0;
+      u.pitch = config.ttsPitch !== undefined ? config.ttsPitch : 1.0;
+      window.speechSynthesis.speak(u);
+    }
+
+    if (window.api && window.api.testChatTts) {
+      const msg = { user: 'TestUser', text: msgText, isFollower: true, isMod: false, isSub: false };
+      window.api.testChatTts(msg);
+    }
+  };
+
+  const esVoices = voices.filter(v => v.lang.toLowerCase().startsWith('es'));
+  const otherVoices = voices.filter(v => !v.lang.toLowerCase().startsWith('es'));
 
   if (activeTab !== 'settings') return null;
 
@@ -327,6 +367,74 @@ export default function OverlaySettings({
             </div>
           </div>
 
+          {/* Custom Blacklist */}
+          <div className="card">
+            <h2>🚫 Lista Negra de Palabras (Blacklist)</h2>
+            <p className="text-xs text-secondary mb-sm">
+              Las canciones o mensajes que contengan estas palabras se bloquearán y censurarán automáticamente (además de la blacklist global).
+            </p>
+            
+            <div className="flex gap-sm mb-md">
+              <input 
+                type="text" 
+                id="custom-blacklist-input" 
+                className="inp flex-1" 
+                placeholder="Palabra o frase a bloquear..." 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const btn = document.getElementById('add-blacklist-btn');
+                    if (btn) btn.click();
+                  }
+                }}
+              />
+              <button 
+                id="add-blacklist-btn"
+                className="btn btn-primary" 
+                onClick={() => {
+                  const input = document.getElementById('custom-blacklist-input');
+                  const word = input?.value?.trim()?.toLowerCase();
+                  if (!word) return;
+                  
+                  const currentList = config.customBlacklist || [];
+                  if (currentList.includes(word)) {
+                    alert('Esta palabra ya está en tu lista negra.');
+                    return;
+                  }
+                  
+                  saveConfig({ customBlacklist: [...currentList, word] });
+                  if (input) input.value = '';
+                }}
+              >
+                Añadir
+              </button>
+            </div>
+
+            <div className="flex-col gap-xs" style={{ maxHeight: 200, overflowY: 'auto', background: 'var(--bg-input)', borderRadius: 8, padding: 10 }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: 13, fontWeight: 700 }}>Palabras Bloqueadas Personalizadas</h4>
+              {(!config.customBlacklist || config.customBlacklist.length === 0) ? (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', padding: 8 }}>
+                  No hay palabras personalizadas agregadas.
+                </div>
+              ) : (
+                config.customBlacklist.map((word, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-xs" style={{ borderBottom: '1px solid var(--border-light)', fontSize: 13 }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>{word}</span>
+                    <button 
+                      className="btn btn-danger" 
+                      style={{ padding: '2px 8px', fontSize: 11, height: 'auto', lineHeight: 1 }}
+                      onClick={() => {
+                        const newList = config.customBlacklist.filter((_, i) => i !== idx);
+                        saveConfig({ customBlacklist: newList });
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           {/* Song Request Settings */}
           <div className="card">
             <div className="flex items-center justify-between mb-sm">
@@ -405,25 +513,99 @@ export default function OverlaySettings({
               <button className={`toggle ${config.enableTTS ? 'on' : ''}`} onClick={() => saveConfig({ enableTTS: !config.enableTTS })}></button>
             </div>
 
-            {/* TTS Chat Prefix */}
+            {/* TTS Settings & Chat Prefix */}
             <div className="flex-col gap-xs mb-sm mt-md" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-light)', padding: 12, borderRadius: 8 }}>
+              <h3 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700 }}>⚙️ Configuración de Voz (TTS)</h3>
+              
+              {/* Voz dropdown */}
+              <div className="flex-col gap-xs mb-sm">
+                <label className="text-xs text-secondary">Seleccionar Voz:</label>
+                <select 
+                  value={config.ttsVoiceURI || ''} 
+                  onChange={(e) => saveConfig({ ttsVoiceURI: e.target.value })} 
+                  className="inp w-full"
+                  style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  <option value="">-- Voz por Defecto del Sistema --</option>
+                  {esVoices.length > 0 && (
+                    <optgroup label="Español (Recomendado)">
+                      {esVoices.map(v => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherVoices.length > 0 && (
+                    <optgroup label="Otros Idiomas">
+                      {otherVoices.map(v => (
+                        <option key={v.voiceURI} value={v.voiceURI}>
+                          {v.name} ({v.lang})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <span className="text-xs text-secondary" style={{ fontStyle: 'italic', display: 'block', marginTop: 4 }}>
+                  Nota: Las voces dependen de tu sistema operativo y navegador (ej. Microsoft Sabina/Helena en Windows).
+                </span>
+              </div>
+
+              {/* Sliders for Rate (Speed) and Pitch (Tone) */}
+              <div className="flex items-center justify-between mb-sm">
+                <span className="text-sm">Velocidad (Fluidez):</span>
+                <div className="flex items-center gap-xs">
+                  <input 
+                    type="range" 
+                    className="slider" 
+                    min="0.5" 
+                    max="2.0" 
+                    step="0.05" 
+                    value={config.ttsRate !== undefined ? config.ttsRate : 1.0} 
+                    style={{ width: 120 }} 
+                    onChange={(e) => saveConfig({ ttsRate: parseFloat(e.target.value) })} 
+                  />
+                  <span className="text-xs font-bold" style={{ width: 35, textAlign: 'right' }}>
+                    {config.ttsRate !== undefined ? config.ttsRate.toFixed(2) : '1.00'}x
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mb-sm">
+                <span className="text-sm">Tono (Femenino / Agudo):</span>
+                <div className="flex items-center gap-xs">
+                  <input 
+                    type="range" 
+                    className="slider" 
+                    min="0.5" 
+                    max="2.0" 
+                    step="0.05" 
+                    value={config.ttsPitch !== undefined ? config.ttsPitch : 1.0} 
+                    style={{ width: 120 }} 
+                    onChange={(e) => saveConfig({ ttsPitch: parseFloat(e.target.value) })} 
+                  />
+                  <span className="text-xs font-bold" style={{ width: 35, textAlign: 'right' }}>
+                    {config.ttsPitch !== undefined ? config.ttsPitch.toFixed(2) : '1.00'}
+                  </span>
+                </div>
+              </div>
+
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: '10px 0' }} />
+
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold">💬 Prefijo para Chat TTS</span>
                 <div className="flex gap-xs items-center">
                   <input type="text" className="inp text-center font-bold" style={{ width: 50 }} maxLength="3" value={config.chatTtsPrefix || '.'} onChange={(e) => saveConfig({ chatTtsPrefix: e.target.value })} />
-                  <button className="btn btn-primary" style={{ padding: '6px 12px' }} onClick={() => {
-                    const prefix = config.chatTtsPrefix || '.';
-                    const customText = document.getElementById('custom-tts-test-input')?.value?.trim();
-                    const msg = { user: 'TestUser', text: customText ? `${prefix}${customText}` : `${prefix}Hola, probando el TTS del chat!`, isFollower: true, isMod: false, isSub: false };
-                    window.api.testChatTts(msg);
-                  }}>Probar Voz</button>
+                  <button className="btn btn-primary" style={{ padding: '6px 12px' }} onClick={testVoiceLocal}>
+                    Probar Voz
+                  </button>
                 </div>
               </div>
               <div className="flex gap-xs items-center mt-xs">
-                <input type="text" id="custom-tts-test-input" className="inp flex-1" placeholder="Ej. Prueba el filtro aquí" />
+                <input type="text" id="custom-tts-test-input" className="inp flex-1" placeholder="Ej. Escribe algo para escuchar la voz de prueba..." />
               </div>
-              <span className="text-xs text-secondary">
-                Los seguidores usarán este prefijo para que la IA los lea (ej. <strong>.hola</strong>).
+              <span className="text-xs text-secondary mt-xs" style={{ display: 'block' }}>
+                Los seguidores usarán este prefijo para que el TTS lea su mensaje (ej. <strong>.hola</strong>).
               </span>
             </div>
           </div>

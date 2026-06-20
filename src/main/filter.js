@@ -1,8 +1,14 @@
 const path = require('path');
 const fs = require('fs');
 const filter = require('leo-profanity');
+const store = require('./store');
 
 let initialized = false;
+
+// Invalidate initialized state on config updates to force database reload
+store.setConfigChangeCallback(() => {
+  initialized = false;
+});
 
 function initFilter() {
   if (initialized) return;
@@ -15,6 +21,16 @@ function initFilter() {
     words = Object.values(blData).filter(Array.isArray).flat();
   } catch (e) {
     console.error('[Filter] Error requiring blacklist.json:', e);
+  }
+
+  // 1b. Load custom blacklist from storage config
+  try {
+    const custom = store.getConfig()?.customBlacklist;
+    if (Array.isArray(custom)) {
+      words.push(...custom);
+    }
+  } catch (e) {
+    console.error('[Filter] Error loading custom blacklist:', e);
   }
 
   // 2. Load naughty-words

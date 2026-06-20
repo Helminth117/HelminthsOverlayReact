@@ -49,7 +49,13 @@ export default function AlertManager() {
         ttsText = TTSFilter.clean(ttsText);
         const u = new SpeechSynthesisUtterance(ttsText);
         u.lang = 'es-ES';
+        if (config.ttsVoiceURI) {
+          const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === config.ttsVoiceURI);
+          if (selectedVoice) u.voice = selectedVoice;
+        }
         u.volume = config.volTts !== undefined ? config.volTts : 1.0;
+        u.rate = config.ttsRate !== undefined ? config.ttsRate : 1.0;
+        u.pitch = config.ttsPitch !== undefined ? config.ttsPitch : 1.0;
         window.speechSynthesis.speak(u);
       }
     }

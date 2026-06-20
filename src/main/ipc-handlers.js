@@ -7,17 +7,16 @@ const { broadcast, getOverlayWin } = require('./windows');
 const { scanSteamGames } = require('./game-scanner');
 const filter = require('./filter');
 
-let cachedBlacklist = null;
 function getBlacklist() {
-  if (cachedBlacklist) return cachedBlacklist;
+  let baseList = [];
   try {
     const blData = require('./blacklist.json');
-    cachedBlacklist = Object.values(blData).filter(Array.isArray).flat();
+    baseList = Object.values(blData).filter(Array.isArray).flat();
   } catch (e) {
     console.error("Error requiring blacklist.json", e);
-    cachedBlacklist = [];
   }
-  return cachedBlacklist;
+  const custom = store.getConfig()?.customBlacklist || [];
+  return [...baseList, ...custom];
 }
 
 function getYtDlpPath() {

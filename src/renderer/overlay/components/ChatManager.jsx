@@ -66,7 +66,13 @@ export default function ChatManager() {
           const cleanText = TTSFilter.clean(textToSpeak);
           const u = new SpeechSynthesisUtterance(`${data.user} dice: ${cleanText}`);
           u.lang = 'es-ES';
+          if (cfg.ttsVoiceURI) {
+            const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === cfg.ttsVoiceURI);
+            if (selectedVoice) u.voice = selectedVoice;
+          }
           u.volume = cfg.volTts !== undefined ? cfg.volTts : 1.0;
+          u.rate = cfg.ttsRate !== undefined ? cfg.ttsRate : 1.0;
+          u.pitch = cfg.ttsPitch !== undefined ? cfg.ttsPitch : 1.0;
           window.speechSynthesis.speak(u);
         }
       }
