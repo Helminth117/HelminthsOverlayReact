@@ -302,35 +302,152 @@ header {
 /* Fallback/Responsive main tabs for mobile viewport */
 @media (max-width: 768px) {
   .app-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    display: block;
+    height: 100vh;
+    overflow: hidden;
   }
   
   .sidebar {
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border-light);
-    padding: var(--space-md);
-    gap: var(--space-md);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    z-index: 1000;
+    background: rgba(18, 18, 24, 0.85) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-right: none !important;
+    padding: 0 var(--space-sm) !important;
+    margin: 0 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .brand-section {
+    display: none !important;
   }
   
   .sidebar-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--space-xs);
-    width: 100%;
+    flex-direction: row !important;
+    justify-content: space-around !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+    gap: 0 !important;
   }
   
   .sidebar-btn {
-    flex: 1;
-    justify-content: center;
-    padding: 10px 12px;
-    font-size: 12.5px;
-    white-space: nowrap;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    height: 100% !important;
+    padding: 6px 0 !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    border-radius: 0 !important;
+    flex: 1 !important;
+    transition: color 0.2s ease, transform 0.1s ease;
+  }
+  
+  .sidebar-btn:active {
+    transform: scale(0.92);
+  }
+
+  .sidebar-btn.active {
+    color: var(--accent) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .sidebar-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+    margin: 0 !important;
   }
   
   .content-area {
-    padding: var(--space-md);
+    padding: var(--space-md) var(--space-md) 84px var(--space-md) !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+  }
+
+  header.flex {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--space-sm) !important;
+    margin-bottom: var(--space-md) !important;
+  }
+
+  header h1 {
+    font-size: 15px !important;
+    text-align: center !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+
+  header .flex.items-center.gap-sm {
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  header button {
+    font-size: 10px !important;
+    padding: 6px 10px !important;
+    height: auto !important;
+  }
+
+  .sub-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 6px !important;
+    margin-bottom: var(--space-md) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    scrollbar-width: none !important; /* Firefox */
+  }
+
+  .sub-tabs::-webkit-scrollbar {
+    display: none !important; /* Chrome/Safari */
+  }
+
+  .sub-tab-btn {
+    flex-shrink: 0 !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .card {
+    padding: var(--space-md) !important;
+    margin-bottom: var(--space-md) !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .sound-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-sm) !important;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--space-sm) !important;
+  }
+
+  .player-controls {
+    justify-content: center !important;
+    gap: var(--space-sm) !important;
   }
 }
 
