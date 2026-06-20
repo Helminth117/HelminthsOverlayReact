@@ -3,10 +3,15 @@ const { BrowserWindow, ipcMain } = require('electron');
 let ytWin = null;
 let overlayWebContents = null;
 
+let currentVolume = 80;
+
 function initYtPlayer(overlayWin) {
   overlayWebContents = overlayWin.webContents;
   
   ipcMain.on('yt-play', (event, { videoId, volume }) => {
+    if (volume !== undefined) {
+      currentVolume = volume;
+    }
     if (!ytWin) {
       ytWin = new BrowserWindow({
         show: false,
@@ -78,7 +83,12 @@ function initYtPlayer(overlayWin) {
   });
 
   ipcMain.on('yt-set-volume', (event, vol) => {
+    currentVolume = vol;
     if (ytWin && !ytWin.isDestroyed()) ytWin.webContents.send('yt-control', { type: 'volume', value: vol });
+  });
+
+  ipcMain.handle('yt-get-volume', () => {
+    return currentVolume;
   });
 }
 
