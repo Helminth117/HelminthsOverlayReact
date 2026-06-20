@@ -88,10 +88,21 @@ async function setupTunnel(port, serverInfo) {
     console.log('[Tunnel] Starting quick tunnel to port:', port);
     tunnelInstance = Tunnel.quick(`http://127.0.0.1:${port}`);
     
-    tunnelInstance.on('url', (url) => {
+    tunnelInstance.on('url', async (url) => {
       console.log('[Tunnel] Secure tunnel is online:', url);
       serverInfo.tunnelUrl = url;
       tunnelUrl = url;
+      
+      // Regenerate connection URL and QR Code using the secure Cloudflare tunnel URL
+      const secureUrl = `${url}/control.html?token=${SESSION_TOKEN}`;
+      serverInfo.url = secureUrl;
+      try {
+        serverInfo.qrcodeDataUrl = await qrcode.toDataURL(secureUrl);
+        console.log('[Tunnel] Secure Remote QR Code generated');
+      } catch (err) {
+        console.error('[Tunnel] Failed to generate secure QR Code:', err);
+      }
+      
       broadcast('tunnel-status', { status: 'online', url });
     });
     
