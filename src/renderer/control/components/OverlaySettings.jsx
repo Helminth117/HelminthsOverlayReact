@@ -51,20 +51,6 @@ export default function OverlaySettings({
     const customText = document.getElementById('custom-tts-test-input')?.value?.trim();
     const prefix = config.chatTtsPrefix || '.';
     const msgText = customText ? `${prefix}${customText}` : `${prefix}Hola, probando la voz del chat!`;
-    
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(customText || 'Hola, probando la voz del chat!');
-      u.lang = 'es-ES';
-      if (config.ttsVoiceURI) {
-        const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === config.ttsVoiceURI);
-        if (selectedVoice) u.voice = selectedVoice;
-      }
-      u.volume = config.volTts !== undefined ? config.volTts : 1.0;
-      u.rate = config.ttsRate !== undefined ? config.ttsRate : 1.0;
-      u.pitch = config.ttsPitch !== undefined ? config.ttsPitch : 1.0;
-      window.speechSynthesis.speak(u);
-    }
 
     if (window.api && window.api.testChatTts) {
       const msg = { user: 'TestUser', text: msgText, isFollower: true, isMod: false, isSub: false };
