@@ -5,21 +5,19 @@ const { FILES, DEFAULT_SESSION, DEFAULT_CONFIG } = require('./constants');
 const store = require('./store');
 const { broadcast, getOverlayWin } = require('./windows');
 const { scanSteamGames } = require('./game-scanner');
+const filter = require('./filter');
 
 let cachedBlacklist = null;
 function getBlacklist() {
   if (cachedBlacklist) return cachedBlacklist;
   try {
-    const blPath = path.join(__dirname, 'blacklist.json');
-    if (fs.existsSync(blPath)) {
-      const blData = JSON.parse(fs.readFileSync(blPath, 'utf8'));
-      cachedBlacklist = Object.values(blData).filter(Array.isArray).flat();
-      return cachedBlacklist;
-    }
+    const blData = require('./blacklist.json');
+    cachedBlacklist = Object.values(blData).filter(Array.isArray).flat();
   } catch (e) {
-    console.error("Error reading blacklist.json", e);
+    console.error("Error requiring blacklist.json", e);
+    cachedBlacklist = [];
   }
-  return [];
+  return cachedBlacklist;
 }
 
 function getYtDlpPath() {
@@ -123,6 +121,36 @@ function registerIpcHandlers(tiktokService, gameDetector) {
 
   ipcMain.handle('get-config', () => getConfig());
   ipcMain.handle('save-config', (_e, data) => updateConfig(data));
+
+  ipcMain.handle('get-fallback-playlist', async () => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { app } = require('electron');
+      const { DATA_DIR } = require('./constants');
+
+      const possiblePaths = [
+        path.join(DATA_DIR, 'canciones.txt'),
+        path.join(app.getPath('userData'), 'canciones.txt'),
+        path.join(app.getAppPath(), 'canciones.txt')
+      ];
+
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          const content = fs.readFileSync(p, 'utf8');
+          const lines = content
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && !line.startsWith('#'));
+          return lines;
+        }
+      }
+      return [];
+    } catch (err) {
+      console.error('get-fallback-playlist error:', err);
+      return [];
+    }
+  });
 
   ipcMain.handle('activate-license', async (_e, key) => {
     const license = require('./license');
@@ -247,7 +275,13 @@ function registerIpcHandlers(tiktokService, gameDetector) {
   });
 
   ipcMain.on('play-soundboard', (_e, id) => broadcast('play-soundboard', id));
-  ipcMain.on('test-chat-tts', (_e, msg) => broadcast('tiktok-chat', msg));
+  ipcMain.on('test-chat-tts', (_e, msg) => {
+    if (msg) {
+      msg.text = filter.cleanText(msg.text);
+      msg.user = filter.cleanText(msg.user);
+    }
+    broadcast('tiktok-chat', msg);
+  });
   ipcMain.on('pin-chat-message', (_e, data) => broadcast('highlight-chat', data));
 
   ipcMain.on('yt-pause', () => { console.log('[Main] RUTA: yt-pause recibido -> broadcast al overlay'); broadcast('yt-pause'); });
@@ -381,6 +415,13 @@ async function searchYoutubeHelper(payload) {
     // Blacklist definitions (Using module-level cache)
     const blacklist = getBlacklist();
     
+    // Filter query through filter.cleanText containing normalizations
+    const cleanQuery = filter.cleanText(query);
+    if (cleanQuery.includes('*') || cleanQuery === '') {
+      console.log('[SearchYT] Query blocked by filter:', query);
+      return null;
+    }
+    
     // 1. Direct URL check (Keep using yt-search for direct links)
     const urlMatch = query.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
     if (urlMatch) {
@@ -416,8 +457,12 @@ async function searchYoutubeHelper(payload) {
          const titleLower = v.name.toLowerCase();
          const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
          
-         // Check blacklist con regex para evitar falsos positivos
-         if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
+         // Check blacklist con filter.cleanText y regex
+         if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower)) ||
+             filter.cleanText(titleLower).includes('*') ||
+             filter.cleanText(authorLower).includes('*')) {
+           continue;
+         }
          
          // Check duration limit (v.duration is in seconds)
          if (v.duration > maxDuration) continue;
@@ -446,7 +491,11 @@ async function searchYoutubeHelper(payload) {
            const v = r[i];
            const titleLower = v.name.toLowerCase();
            const authorLower = v.artist ? v.artist.name.toLowerCase() : '';
-           if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower))) continue;
+            if (blacklistRegexes.some(regex => regex.test(titleLower) || regex.test(authorLower)) ||
+                filter.cleanText(titleLower).includes('*') ||
+                filter.cleanText(authorLower).includes('*')) {
+              continue;
+            }
            if (v.duration > maxDuration) continue;
            if (v.duration > 600 && (titleLower.includes('1 hour') || titleLower.includes('10 hour') || titleLower.includes('loop'))) continue;
            bestVideo = v;
@@ -527,6 +576,10 @@ function createRpcHandler(tiktokService, gameDetector) {
         }
         case 'testChatTts': {
           const msg = args[0];
+          if (msg) {
+            msg.text = filter.cleanText(msg.text);
+            msg.user = filter.cleanText(msg.user);
+          }
           const text = (msg && msg.text || '').trim().toLowerCase();
           if (text === '!pause') { console.log('[Server] RUTA: Móvil envía !pause -> broadcast yt-pause al overlay'); broadcast('yt-pause'); return true; }
           if (text === '!resume' || text === '!play') { console.log('[Server] RUTA: Móvil envía !resume -> broadcast yt-resume al overlay'); broadcast('yt-resume'); return true; }

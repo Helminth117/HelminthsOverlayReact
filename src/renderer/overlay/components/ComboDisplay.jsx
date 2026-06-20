@@ -92,7 +92,7 @@ export default function ComboDisplay() {
       
       // Keep drain interval running to handle spams
       if (!drainTimerRef.current) {
-        drainTimerRef.current = setInterval(processQueue, 180); // process batches every 180ms
+        drainTimerRef.current = setInterval(processQueue, 50); // process batches every 50ms
       }
     });
 

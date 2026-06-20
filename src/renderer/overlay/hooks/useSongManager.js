@@ -18,6 +18,28 @@ export function useSongManager() {
   const isPreloadingQueue = useRef(false);
   const lastSyncedIndexRef = useRef(-1);
 
+  const fallbackSongs = useRef([]);
+  const fallbackQueue = useRef([]);
+
+  const shuffleFallbackQueue = () => {
+    if (fallbackSongs.current.length === 0) {
+      fallbackQueue.current = [];
+      return;
+    }
+    const arr = fallbackSongs.current.map(query => ({
+      query,
+      user: 'Respaldo',
+      preloaded: false,
+      isPreloading: false,
+      isFallback: true
+    }));
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    fallbackQueue.current = arr;
+  };
+
   useEffect(() => {
     configRef.current = config;
   }, [config]);
@@ -111,7 +133,10 @@ export function useSongManager() {
 
   const preloadNextSong = async () => {
     if (isPreloadingQueue.current) return;
-    const songToPreload = songQueue.current.find(s => !s.preloaded && !s.isPreloading);
+    let songToPreload = songQueue.current.find(s => !s.preloaded && !s.isPreloading);
+    if (!songToPreload && configRef.current.enableFallbackPlaylist !== false && fallbackQueue.current.length > 0) {
+      songToPreload = fallbackQueue.current.find(s => !s.preloaded && !s.isPreloading);
+    }
     if (!songToPreload) return;
 
     isPreloadingQueue.current = true;
@@ -195,7 +220,18 @@ export function useSongManager() {
   const playNextSong = async () => {
     console.log('[Cola] Avanzando. Canciones restantes:', songQueue.current.length);
     if (isPlayingYt.current) return;
-    if (songQueue.current.length === 0) {
+
+    let next = null;
+    if (songQueue.current.length > 0) {
+      next = songQueue.current.shift();
+    } else if (configRef.current.enableFallbackPlaylist !== false && fallbackQueue.current.length > 0) {
+      next = fallbackQueue.current.shift();
+      if (fallbackQueue.current.length === 0) {
+        shuffleFallbackQueue();
+      }
+    }
+
+    if (!next) {
       stopCurrentAudio();
       isPlayingYt.current = false;
       currentSong.current = null;
@@ -209,7 +245,6 @@ export function useSongManager() {
     clearLyrics();
 
     isPlayingYt.current = true;
-    const next = songQueue.current.shift();
     currentSong.current = next;
     broadcastQueue();
 
@@ -355,9 +390,25 @@ export function useSongManager() {
     }
   };
 
-  const addSongToQueue = (query, user) => {
+  const addSongToQueue = async (query, user) => {
     console.log('[Cola] Intentando añadir canción:', query, user);
-    songQueue.current.push({ query, user, preloaded: false, isPreloading: false });
+    let video = null;
+    if (window.api?.searchYoutube) {
+      video = await window.api.searchYoutube(query);
+    }
+
+    if (!video || !video.videoId) {
+      window.dispatchEvent(new CustomEvent('enqueue-alert', {
+        detail: {
+          type: 'bot',
+          message: `❌ Canción no disponible`,
+          ttsMessage: `Lo siento ${user}, no encontré esa canción o está en la lista negra.`
+        }
+      }));
+      return;
+    }
+
+    songQueue.current.push({ query, user, video, preloaded: true, isPreloading: false });
     if (songQueue.current.length > 50) songQueue.current.shift();
 
     const queuePos = isPlayingYt.current ? songQueue.current.length : 1;
@@ -369,8 +420,8 @@ export function useSongManager() {
       window.dispatchEvent(new CustomEvent('enqueue-alert', {
         detail: {
           type: 'bot',
-          message: `🎵 Añadido a la cola (#${queuePos})`,
-          ttsMessage: `¡Claro que sí, ${user}! Añadí tu canción a la cola.`
+          message: `🎵 ${video.title} (#${queuePos})`,
+          ttsMessage: `¡Claro que sí, ${user}! Añadí ${video.title} a la cola.`
         }
       }));
     } catch (err) {
@@ -484,6 +535,23 @@ export function useSongManager() {
       }
     };
     window.addEventListener('media-seek-request', seekRequestHandler);
+
+    // Cargar playlist de respaldo al iniciar
+    const loadFallbackPlaylist = async () => {
+      if (window.api?.getFallbackPlaylist) {
+        try {
+          const list = await window.api.getFallbackPlaylist();
+          fallbackSongs.current = list;
+          shuffleFallbackQueue();
+          if (!isPlayingYt.current && songQueue.current.length === 0) {
+            playNextSong();
+          }
+        } catch (e) {
+          console.error('[Cola] Error cargando lista respaldo:', e);
+        }
+      }
+    };
+    loadFallbackPlaylist();
 
     return () => {
       window.api.off('play-yt', handlerPlayYt);

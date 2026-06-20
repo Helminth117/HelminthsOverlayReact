@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('api', {
   // ── YouTube Audio Stream (ad-free) ──
   getAudioStreamUrl: (videoId) => ipcRenderer.invoke('get-audio-stream-url', videoId),
   getLyrics: (query) => ipcRenderer.invoke('get-lyrics', query),
+  getFallbackPlaylist: () => ipcRenderer.invoke('get-fallback-playlist'),
 
   // ── Chat TTS Test & Pin ──
   testChatTts: (msg) => ipcRenderer.send('test-chat-tts', msg),

@@ -1,6 +1,7 @@
 const { WebcastPushConnection } = require('tiktok-live-connector');
 const fs = require('fs');
 const path = require('path');
+const filter = require('./filter');
 
 class TikTokService {
   constructor(broadcast, getConfig) {
@@ -87,7 +88,7 @@ class TikTokService {
       this.connection = new WebcastPushConnection(username, { enableExtendedGiftInfo: true });
 
       if (this.flushInterval) clearInterval(this.flushInterval);
-      this.flushInterval = setInterval(() => this.flushBufferedEvents(), 1000);
+      this.flushInterval = setInterval(() => this.flushBufferedEvents(), 100);
 
       this.connection.on('disconnected', () => {
         console.log('[TikTok] Disconnected, retrying...');
@@ -113,7 +114,8 @@ class TikTokService {
         const user = d?.uniqueId || d?.user?.uniqueId || d?.nickname || 'alguien';
         this.stats.latestFollower = user;
         this.statsDirty = true;
-        this.broadcast('stream-alert', { type: 'follow', user, message: `¡@${user} te siguió!` });
+        const cleanUser = filter.cleanText(user);
+        this.broadcast('stream-alert', { type: 'follow', user: cleanUser, message: `¡@${cleanUser} te siguió!` });
         const cfg = this.getConfig();
         if (cfg.followersGoal && this.stats.followers_gained >= cfg.followersGoal) {
           this.broadcast('stream-alert', { type: 'goal', message: `¡${cfg.followersGoal} seguidores!` });
@@ -141,7 +143,13 @@ class TikTokService {
           this.userGifts = newGifts;
         }
         this.statsDirty = true;
-        this.broadcast('stream-alert', { type: 'gift', user, gift, count });
+
+        // Skip intermediate streak events to prevent flooding the alert queue
+        if (d?.giftType === 1 && !d?.repeatEnd) {
+          return;
+        }
+
+        this.broadcast('stream-alert', { type: 'gift', user: filter.cleanText(user), gift: filter.cleanText(gift), count });
       });
       this.connection.on('member', d => {
         this.stats.viewers = Math.max(this.stats.viewers, 1);
@@ -161,7 +169,7 @@ class TikTokService {
         }
         // -----------------------
 
-        if (text) this.broadcast('tiktok-chat', { user, text, isMod, isSub, isFollower });
+        if (text) this.broadcast('tiktok-chat', { user: filter.cleanText(user), text: filter.cleanText(text), isMod, isSub, isFollower });
       });
 
       await this.connection.connect();
