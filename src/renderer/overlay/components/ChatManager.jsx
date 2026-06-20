@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useOverlayStore } from '../../store';
 import { DraggableWidget } from './DraggableWidget';
-import { TTSFilter } from '../utils/ttsFilter';
+import { speakText } from '../utils/speech';
 
 export default function ChatManager() {
   const [messages, setMessages] = useState([]);
@@ -60,20 +60,10 @@ export default function ChatManager() {
       // TTS
       const cfg = configRef.current;
       const ttsPrefix = cfg.chatTtsPrefix || '.';
-      if (cfg.enableTTS && window.speechSynthesis && data.isFollower && data.text && data.text.startsWith(ttsPrefix)) {
+      if (cfg.enableTTS && data.isFollower && data.text && data.text.startsWith(ttsPrefix)) {
         const textToSpeak = data.text.slice(ttsPrefix.length).trim();
         if (textToSpeak) {
-          const cleanText = TTSFilter.clean(textToSpeak);
-          const u = new SpeechSynthesisUtterance(`${data.user} dice: ${cleanText}`);
-          u.lang = 'es-ES';
-          if (cfg.ttsVoiceURI) {
-            const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === cfg.ttsVoiceURI);
-            if (selectedVoice) u.voice = selectedVoice;
-          }
-          u.volume = cfg.volTts !== undefined ? cfg.volTts : 1.0;
-          u.rate = cfg.ttsRate !== undefined ? cfg.ttsRate : 1.0;
-          u.pitch = cfg.ttsPitch !== undefined ? cfg.ttsPitch : 1.0;
-          window.speechSynthesis.speak(u);
+          speakText(`${data.user} dice: ${textToSpeak}`, cfg);
         }
       }
 

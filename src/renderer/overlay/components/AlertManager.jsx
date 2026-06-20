@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useOverlayStore } from '../../store';
-import { TTSFilter } from '../utils/ttsFilter';
+import { speakText } from '../utils/speech';
 import { launchAlertConfeti } from '../utils/confettiHelper';
 import { UserPlus, Gift, Gamepad2, Trophy, Bot, Bell } from 'lucide-react';
 
@@ -38,7 +38,7 @@ export default function AlertManager() {
     
     if (window.playAlertSound) window.playAlertSound(data.type || 'follow');
 
-    if (config.enableTTS && window.speechSynthesis && !data.disableTts && data.type !== 'game') {
+    if (config.enableTTS && !data.disableTts && data.type !== 'game') {
       let ttsText = '';
       if (data.type === 'follow') ttsText = `Nuevo seguidor, gracias ${data.user}`;
       else if (data.type === 'gift') ttsText = `${data.user} ha regalado ${data.count} ${data.gift}`;
@@ -46,17 +46,7 @@ export default function AlertManager() {
       else if (data.type === 'bot') ttsText = data.ttsMessage || data.message;
       
       if (ttsText) {
-        ttsText = TTSFilter.clean(ttsText);
-        const u = new SpeechSynthesisUtterance(ttsText);
-        u.lang = 'es-ES';
-        if (config.ttsVoiceURI) {
-          const selectedVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === config.ttsVoiceURI);
-          if (selectedVoice) u.voice = selectedVoice;
-        }
-        u.volume = config.volTts !== undefined ? config.volTts : 1.0;
-        u.rate = config.ttsRate !== undefined ? config.ttsRate : 1.0;
-        u.pitch = config.ttsPitch !== undefined ? config.ttsPitch : 1.0;
-        window.speechSynthesis.speak(u);
+        speakText(ttsText, config);
       }
     }
 

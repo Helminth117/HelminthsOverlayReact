@@ -503,39 +503,55 @@ export default function OverlaySettings({
             <div className="flex-col gap-xs mb-sm mt-md" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-light)', padding: 12, borderRadius: 8 }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: 13, fontWeight: 700 }}>⚙️ Configuración de Voz (TTS)</h3>
               
-              {/* Voz dropdown */}
+              {/* Proveedor dropdown */}
               <div className="flex-col gap-xs mb-sm">
-                <label className="text-xs text-secondary">Seleccionar Voz:</label>
+                <label className="text-xs text-secondary">Motor / Proveedor de Voz:</label>
                 <select 
-                  value={config.ttsVoiceURI || ''} 
-                  onChange={(e) => saveConfig({ ttsVoiceURI: e.target.value })} 
+                  value={config.ttsProvider || 'browser'} 
+                  onChange={(e) => saveConfig({ ttsProvider: e.target.value })} 
                   className="inp w-full"
                   style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }}
                 >
-                  <option value="">-- Voz por Defecto del Sistema --</option>
-                  {esVoices.length > 0 && (
-                    <optgroup label="Español (Recomendado)">
-                      {esVoices.map(v => (
-                        <option key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} ({v.lang})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {otherVoices.length > 0 && (
-                    <optgroup label="Otros Idiomas">
-                      {otherVoices.map(v => (
-                        <option key={v.voiceURI} value={v.voiceURI}>
-                          {v.name} ({v.lang})
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  <option value="browser">Voces del Sistema (Offline/Locales)</option>
+                  <option value="google">Voz de Google Translate (Online/Femenina y Fluida)</option>
                 </select>
-                <span className="text-xs text-secondary" style={{ fontStyle: 'italic', display: 'block', marginTop: 4 }}>
-                  Nota: Las voces dependen de tu sistema operativo y navegador (ej. Microsoft Sabina/Helena en Windows).
-                </span>
               </div>
+
+              {/* Voz dropdown */}
+              {(config.ttsProvider || 'browser') === 'browser' && (
+                <div className="flex-col gap-xs mb-sm">
+                  <label className="text-xs text-secondary">Seleccionar Voz:</label>
+                  <select 
+                    value={config.ttsVoiceURI || ''} 
+                    onChange={(e) => saveConfig({ ttsVoiceURI: e.target.value })} 
+                    className="inp w-full"
+                    style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' }}
+                  >
+                    <option value="">-- Voz por Defecto del Sistema --</option>
+                    {esVoices.length > 0 && (
+                      <optgroup label="Español (Recomendado)">
+                        {esVoices.map(v => (
+                          <option key={v.voiceURI} value={v.voiceURI}>
+                            {v.name} ({v.lang})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherVoices.length > 0 && (
+                      <optgroup label="Otros Idiomas">
+                        {otherVoices.map(v => (
+                          <option key={v.voiceURI} value={v.voiceURI}>
+                            {v.name} ({v.lang})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <span className="text-xs text-secondary" style={{ fontStyle: 'italic', display: 'block', marginTop: 4 }}>
+                    Nota: Las voces dependen de tu sistema operativo y navegador (ej. Microsoft Sabina/Helena en Windows).
+                  </span>
+                </div>
+              )}
 
               {/* Sliders for Rate (Speed) and Pitch (Tone) */}
               <div className="flex items-center justify-between mb-sm">
@@ -557,24 +573,26 @@ export default function OverlaySettings({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between mb-sm">
-                <span className="text-sm">Tono (Femenino / Agudo):</span>
-                <div className="flex items-center gap-xs">
-                  <input 
-                    type="range" 
-                    className="slider" 
-                    min="0.5" 
-                    max="2.0" 
-                    step="0.05" 
-                    value={config.ttsPitch !== undefined ? config.ttsPitch : 1.0} 
-                    style={{ width: 120 }} 
-                    onChange={(e) => saveConfig({ ttsPitch: parseFloat(e.target.value) })} 
-                  />
-                  <span className="text-xs font-bold" style={{ width: 35, textAlign: 'right' }}>
-                    {config.ttsPitch !== undefined ? config.ttsPitch.toFixed(2) : '1.00'}
-                  </span>
+              {(config.ttsProvider || 'browser') === 'browser' && (
+                <div className="flex items-center justify-between mb-sm">
+                  <span className="text-sm">Tono (Femenino / Agudo):</span>
+                  <div className="flex items-center gap-xs">
+                    <input 
+                      type="range" 
+                      className="slider" 
+                      min="0.5" 
+                      max="2.0" 
+                      step="0.05" 
+                      value={config.ttsPitch !== undefined ? config.ttsPitch : 1.0} 
+                      style={{ width: 120 }} 
+                      onChange={(e) => saveConfig({ ttsPitch: parseFloat(e.target.value) })} 
+                    />
+                    <span className="text-xs font-bold" style={{ width: 35, textAlign: 'right' }}>
+                      {config.ttsPitch !== undefined ? config.ttsPitch.toFixed(2) : '1.00'}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: '10px 0' }} />
 
