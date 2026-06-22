@@ -30,12 +30,63 @@ export default function TopEventsCarousel() {
   }, []);
 
   const config = useOverlayStore(s => s.config);
+  const isCosmic = (() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isHorizontal = urlParams.get('type') === 'horizontal';
+    const activeTheme = isHorizontal
+      ? (config?.themeHorizontal || 'theme-luna-cosmic')
+      : (config?.theme || 'theme-liquid-glass');
+    return activeTheme === 'theme-luna-cosmic';
+  })();
   
   const slides = [
-    { type: 'follower', label: 'ÚLTIMO\nSEGUIDOR', value: events.follower, icon: getGameAlertIconUrl('follow', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Crown/3D/crown_3d.png' },
-    { type: 'liker', label: 'DONADOR DE\nLIKES', value: events.liker, icon: getGameAlertIconUrl('liker', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Sparkling%20heart/3D/sparkling_heart_3d.png' },
-    { type: 'gifter', label: 'MAYOR DONADOR\nREGALOS', value: events.gifter, icon: getGameAlertIconUrl('gift', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Gem%20stone/3D/gem_stone_3d.png' }
+    { type: 'follower', bg: '/assets/Stream Label_Follow.png', label: 'ÚLTIMO\nSEGUIDOR', value: events.follower, icon: getGameAlertIconUrl('follow', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Crown/3D/crown_3d.png' },
+    { type: 'liker', bg: '/assets/Stream Label_Sub.png', label: 'DONADOR DE\nLIKES', value: events.liker, icon: getGameAlertIconUrl('liker', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Sparkling%20heart/3D/sparkling_heart_3d.png' },
+    { type: 'gifter', bg: '/assets/Stream Label_Donation.png', label: 'MAYOR DONADOR\nREGALOS', value: events.gifter, icon: getGameAlertIconUrl('gift', {}, config?.gameName) || 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Gem%20stone/3D/gem_stone_3d.png' }
   ];
+
+  if (isCosmic) {
+    return (
+      <div id="topevents-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)', transform: `translateY(-${index * 100}%)` }}>
+        {slides.map((s, i) => (
+          <div 
+            key={i} 
+            className="topevent-slide" 
+            style={{ 
+              flex: '0 0 100%', 
+              width: '100%', 
+              height: '100%', 
+              backgroundImage: `url('${s.bg}')`,
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              paddingRight: '12px',
+              boxSizing: 'border-box'
+            }}
+          >
+            <span style={{ 
+              fontFamily: "'Outfit', 'Inter', sans-serif",
+              fontWeight: 900, 
+              fontSize: '11px', 
+              color: '#ffffff', 
+              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+              maxWidth: '55%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginRight: '22px',
+              letterSpacing: '0.5px'
+            }}>
+              {s.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div id="topevents-container" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)', transform: `translateY(-${index * 100}%)` }}>

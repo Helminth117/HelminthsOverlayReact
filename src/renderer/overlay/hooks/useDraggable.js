@@ -3,7 +3,17 @@ import { useOverlayStore } from '../../store';
 
 export function useDraggable(id, elRef, defaultPos) {
   const isMoving = useOverlayStore(state => state.isMoving);
-  const { layout, widgets, textAlign } = useOverlayStore(state => state.config) || {};
+  const config = useOverlayStore(state => state.config) || {};
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const isHorizontal = urlParams.get('type') === 'horizontal';
+  const layoutKey = isHorizontal ? 'layoutHorizontal' : 'layout';
+  const widgetsKey = isHorizontal ? 'widgetsHorizontal' : 'widgets';
+
+  const layout = config[layoutKey];
+  const widgets = config[widgetsKey];
+  const textAlign = config.textAlign;
+
   const [localPos, setLocalPos] = useState(null);
 
   // Sync position from config when not moving locally
@@ -130,10 +140,11 @@ export function useDraggable(id, elRef, defaultPos) {
       } else {
         window.api.getConfig().then(cfg => {
           if (!cfg) return;
-          if (!cfg.layout) cfg.layout = { modules: {}, borders: {} };
-          if (!cfg.layout.modules) cfg.layout.modules = {};
-          cfg.layout.modules[id] = { ...cfg.layout.modules[id], ...newPos };
-          window.api.saveConfig();
+          const key = isHorizontal ? 'layoutHorizontal' : 'layout';
+          if (!cfg[key]) cfg[key] = { modules: {}, borders: {} };
+          if (!cfg[key].modules) cfg[key].modules = {};
+          cfg[key].modules[id] = { ...cfg[key].modules[id], ...newPos };
+          window.api.saveConfig({ [key]: cfg[key] });
         });
       }
     };
@@ -209,10 +220,11 @@ export function useDraggable(id, elRef, defaultPos) {
       } else {
         window.api.getConfig().then(cfg => {
           if (!cfg) return;
-          if (!cfg.layout) cfg.layout = { modules: {}, borders: {} };
-          if (!cfg.layout.modules) cfg.layout.modules = {};
-          cfg.layout.modules[id] = { ...cfg.layout.modules[id], ...newPos };
-          window.api.saveConfig();
+          const key = isHorizontal ? 'layoutHorizontal' : 'layout';
+          if (!cfg[key]) cfg[key] = { modules: {}, borders: {} };
+          if (!cfg[key].modules) cfg[key].modules = {};
+          cfg[key].modules[id] = { ...cfg[key].modules[id], ...newPos };
+          window.api.saveConfig({ [key]: cfg[key] });
         });
       }
     };

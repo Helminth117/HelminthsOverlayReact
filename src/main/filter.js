@@ -59,11 +59,16 @@ function initFilter() {
   console.log(`[Filter] Bad words database initialized with ${cleanWords.length} terms.`);
 }
 
-function cleanText(text) {
+function cleanText(text, strict = true) {
   if (!text) return '';
   initFilter();
   
-  // Normalization for leetspeak/spacing bypass checks
+  if (!strict) {
+    // Less aggressive check for YT search. Just use standard word-by-word cleaning.
+    return filter.clean(text);
+  }
+  
+  // Normalization for leetspeak/spacing bypass checks (strict mode for Chat/TTS)
   const normalized = text.toLowerCase()
     .replace(/\s+/g, '') 
     .replace(/[^\w]/g, '') 

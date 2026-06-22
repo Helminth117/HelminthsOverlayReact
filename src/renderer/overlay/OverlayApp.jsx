@@ -69,6 +69,62 @@ export default function OverlayApp() {
   const [bgFading, setBgFading] = useState(false);
   const [activeWidget, setActiveWidget] = useState(null);
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isHorizontal = urlParams.get('type') === 'horizontal';
+  const widgetsKey = isHorizontal ? 'widgetsHorizontal' : 'widgets';
+  const activeWidgets = config?.[widgetsKey] || {};
+
+  const isWidgetActive = (key) => activeWidgets[key] !== false;
+
+  const activeTheme = isHorizontal ? (config?.themeHorizontal || 'theme-luna-cosmic') : (config?.theme || 'theme-liquid-glass');
+
+  useEffect(() => {
+    document.body.className = Array.from(document.body.classList).filter(c => !c.startsWith('theme-')).join(' ');
+    document.body.classList.add(activeTheme);
+
+    if (isHorizontal) {
+      document.body.classList.add('horizontal-layout');
+    } else {
+      document.body.classList.remove('horizontal-layout');
+    }
+  }, [isHorizontal, activeTheme]);
+
+  const getWidgetDefaultPos = (id) => {
+    const verticalDefaults = {
+      'comp-user': { t: '20px', l: '20px' },
+      'comp-socials': { t: '80px', l: '20px' },
+      'comp-topevents': { t: '150px', l: '20px' },
+      'comp-stats': { t: '230px', l: '20px' },
+      'comp-objs': { t: '320px', l: '20px' },
+      'comp-timers': { t: '430px', l: '20px' },
+      'comp-game': { t: '20px', r: '20px' },
+      'comp-chat': { t: '520px', l: '20px', w: '350px', h: '300px' },
+      'comp-visualizer': { b: '20px', l: '20px' },
+      'comp-spotify': { b: '100px', r: '20px' },
+      'comp-local-media': { b: '20px', r: '20px' },
+      'comp-poll': { t: '520px', r: '20px', w: '300px' },
+      'comp-webcam': { t: '200px', l: '20px', w: '300px', h: '170px' },
+    };
+
+    const horizontalDefaults = {
+      'comp-user': { t: '20px', l: '20px' },
+      'comp-socials': { t: '20px', l: '240px' },
+      'comp-game': { t: '20px', r: '20px' },
+      'comp-chat': { t: '90px', l: '20px', w: '320px', h: '380px' },
+      'comp-stats': { t: '90px', r: '20px', w: '260px' },
+      'comp-objs': { b: '30px', l: '240px', w: '400px' },
+      'comp-timers': { t: '220px', r: '20px', w: '180px' },
+      'comp-topevents': { t: '300px', r: '20px', w: '180px' },
+      'comp-visualizer': { b: '20px', l: '20px' },
+      'comp-spotify': { b: '30px', r: '20px', w: '300px', h: '80px' },
+      'comp-local-media': { b: '130px', r: '20px', w: '300px' },
+      'comp-poll': { t: '380px', l: '20px', w: '320px' },
+      'comp-webcam': { t: '90px', l: '370px', w: '350px', h: '220px' },
+    };
+
+    return isHorizontal ? (horizontalDefaults[id] || { t: '100px', l: '100px' }) : (verticalDefaults[id] || { t: '100px', l: '100px' });
+  };
+
   useEffect(() => {
     window.isolateWidgetsAbs = () => {
       let changed = false;
@@ -171,7 +227,11 @@ export default function OverlayApp() {
         const cfg = await window.api.getConfig();
         if (!cfg) return;
         
-        const layout = cfg.layout || { modules: {}, borders: {} };
+        const urlParams = new URLSearchParams(window.location.search);
+        const isHorizontal = urlParams.get('type') === 'horizontal';
+        const layoutKey = isHorizontal ? 'layoutHorizontal' : 'layout';
+        
+        const layout = cfg[layoutKey] || { modules: {}, borders: {} };
         if (!layout.modules) layout.modules = {};
         if (!layout.borders) layout.borders = {};
         
@@ -211,8 +271,8 @@ export default function OverlayApp() {
         if (lt) layout.borders.top = lt.style.top;
         if (lb) layout.borders.bottom = lb.style.bottom;
         
-        await window.api.saveConfig({ layout });
-        setConfig({ ...cfg, layout });
+        await window.api.saveConfig({ [layoutKey]: layout });
+        setConfig({ ...cfg, [layoutKey]: layout });
       }, 500);
     };
 
@@ -257,7 +317,7 @@ export default function OverlayApp() {
       if (config.fontFamily) document.documentElement.style.setProperty('--font-ui', config.fontFamily);
       
       document.body.className = Array.from(document.body.classList).filter(c => !c.startsWith('theme-')).join(' ');
-      document.body.classList.add(config.theme || 'theme-liquid-glass');
+      document.body.classList.add(activeTheme);
 
       if (config.moveMode !== undefined) {
         const wasEditMode = document.body.classList.contains('edit-mode');
@@ -299,7 +359,7 @@ export default function OverlayApp() {
         if (window.syncCorners) window.syncCorners();
       }
     }
-  }, [config]);
+  }, [config, activeTheme]);
 
   useEffect(() => {
     const imageUrl = getOverlayImageUrl(config?.gameImage);
@@ -372,7 +432,7 @@ export default function OverlayApp() {
 
   return (
     <>
-      <div id="comp-frame" className={`drag-item lockable-widget locked-widget ${!config?.widgets?.frame && config?.widgets?.frame !== undefined ? 'hidden' : ''}`} data-title="Marco del Stream" style={{ pointerEvents: isMoving ? 'auto' : 'none' }}>
+      <div id="comp-frame" className={`drag-item lockable-widget locked-widget ${!isWidgetActive('frame') ? 'hidden' : ''}`} data-title="Marco del Stream" style={{ pointerEvents: isMoving ? 'auto' : 'none' }}>
         <div className="widget-content frame-content" style={{ borderWidth: `${frameThickness}px`, borderColor: 'var(--accent)' }}></div>
       </div>
 
@@ -385,11 +445,11 @@ export default function OverlayApp() {
 
       <div id="ambilight-frame" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 9999, pointerEvents: 'none', boxSizing: 'border-box', opacity: 0, transition: 'opacity 0.3s ease, box-shadow 0.3s ease', border: '4px solid transparent' }}></div>
 
-      <DraggableWidget id="comp-user" title="Perfil de Usuario" isGlass={config?.glassWidgets?.user !== false} defaultPos={{ t: '20px', l: '20px' }}>
+      <DraggableWidget id="comp-user" title="Perfil de Usuario" isGlass={config?.glassWidgets?.user !== false} defaultPos={getWidgetDefaultPos('comp-user')}>
         <UserProfile />
       </DraggableWidget>
 
-      <DraggableWidget id="comp-socials" title="Redes Sociales" isGlass={config?.glassWidgets?.socials !== false} defaultPos={{ t: '80px', l: '20px' }}>
+      <DraggableWidget id="comp-socials" title="Redes Sociales" isGlass={config?.glassWidgets?.socials !== false} defaultPos={getWidgetDefaultPos('comp-socials')}>
         <div id="social-stack" className="social-row">
           {config?.social?.filter(s => s.visible && s.handle).map((s, idx) => {
             const iconKey = (s.icon || s.id || '').toLowerCase();
@@ -407,7 +467,7 @@ export default function OverlayApp() {
 
 
       {config?.game?.filter(c => c.visible !== false).map((c, i) => (
-        <DraggableWidget key={c.id} id={`comp-chip-${c.id}`} title={c.label} isGlass={config?.glassWidgets?.chips !== false} className="dynamic-chip" style={{ display: config?.widgets?.chips !== false ? 'flex' : 'none', top: `${250 + i * 45}px`, left: '20px' }}>
+        <DraggableWidget key={c.id} id={`comp-chip-${c.id}`} title={c.label} isGlass={config?.glassWidgets?.chips !== false} className="dynamic-chip" defaultPos={getWidgetDefaultPos(`comp-chip-${c.id}`)} style={{ display: isWidgetActive('chips') ? 'flex' : 'none', top: `${250 + i * 45}px`, left: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', padding: '0 4px', whiteSpace: 'nowrap' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               <ChipIcon id={c.id} fallbackIcon={c.icon} />
@@ -417,48 +477,79 @@ export default function OverlayApp() {
         </DraggableWidget>
       ))}
 
-      <DraggableWidget id="comp-topevents" title="Últimos Eventos" isGlass={config?.glassWidgets?.topevents !== false} style={{ overflow: 'hidden', width: '140px', height: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <DraggableWidget 
+        id="comp-topevents" 
+        title="Últimos Eventos" 
+        isGlass={activeTheme === 'theme-luna-cosmic' ? false : (config?.glassWidgets?.topevents !== false)} 
+        noContainer={activeTheme === 'theme-luna-cosmic'}
+        defaultPos={getWidgetDefaultPos('comp-topevents')} 
+        style={{ 
+          overflow: 'hidden', 
+          width: activeTheme === 'theme-luna-cosmic' ? '280px' : '140px', 
+          height: activeTheme === 'theme-luna-cosmic' ? '60px' : '120px', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center' 
+        }}
+      >
         <TopEventsCarousel />
       </DraggableWidget>
 
       <ComboDisplay />
 
-      <DraggableWidget id="comp-stats" title="Estadísticas" isGlass={config?.glassWidgets?.stats !== false}>
+      <DraggableWidget id="comp-stats" title="Estadísticas" isGlass={config?.glassWidgets?.stats !== false} defaultPos={getWidgetDefaultPos('comp-stats')}>
         <StatsDisplay />
       </DraggableWidget>
 
-      <DraggableWidget id="comp-objs" title="Objetivos" isGlass={config?.glassWidgets?.objs !== false}>
+      <DraggableWidget id="comp-objs" title="Objetivos" isGlass={config?.glassWidgets?.objs !== false} defaultPos={getWidgetDefaultPos('comp-objs')}>
         <GoalsList />
       </DraggableWidget>
 
       <PollDisplay />
 
-      <DraggableWidget id="comp-timers" title="Temporizador" isGlass={config?.glassWidgets?.timers !== false}>
+      <DraggableWidget id="comp-timers" title="Temporizador" isGlass={config?.glassWidgets?.timers !== false} defaultPos={getWidgetDefaultPos('comp-timers')}>
         <div className="timer-box">
           <TimerDisplay />
         </div>
       </DraggableWidget>
 
-      <DraggableWidget id="comp-game" title="Juego Actual" isGlass={config?.glassWidgets?.game !== false} className="text-right">
+      <DraggableWidget id="comp-game" title="Juego Actual" isGlass={config?.glassWidgets?.game !== false} defaultPos={getWidgetDefaultPos('comp-game')} className="text-right">
         <div className="val" id="game-name">{config?.gameName?.toUpperCase() || 'MINECRAFT'}</div>
       </DraggableWidget>
 
       <ChatManager />
 
-      <DraggableWidget id="comp-visualizer" title="Visualizador de Audio" isGlass={false} noContainer={true} style={{ minWidth: '150px', minHeight: '50px', position: 'relative', overflow: 'visible' }}>
+      <DraggableWidget id="comp-visualizer" title="Visualizador de Audio" isGlass={false} noContainer={true} defaultPos={getWidgetDefaultPos('comp-visualizer')} style={{ minWidth: '150px', minHeight: '50px', position: 'relative', overflow: 'visible' }}>
         <Visualizer />
       </DraggableWidget>
 
       <LyricsDisplay />
 
-      <DraggableWidget id="comp-spotify" title="Spotify Iframe" isGlass={false} noContainer={true}>
+      <DraggableWidget id="comp-spotify" title="Spotify Iframe" isGlass={false} noContainer={true} defaultPos={getWidgetDefaultPos('comp-spotify')}>
         <div className="glass" style={{ padding: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <iframe id="spotify-frame" src={config?.spotifyUrl || 'about:blank'} sandbox="allow-scripts allow-same-origin" style={{ border: 'none', pointerEvents: 'none', width: `${config?.spotifyW || 400}px`, height: `${config?.spotifyH || 150}px` }}></iframe>
         </div>
       </DraggableWidget>
 
-      <DraggableWidget id="comp-local-media" title="Música Local" isGlass={false} noContainer={true}>
+      <DraggableWidget id="comp-local-media" title="Música Local" isGlass={false} noContainer={true} defaultPos={getWidgetDefaultPos('comp-local-media')}>
         <WinIsland />
+      </DraggableWidget>
+
+      <DraggableWidget 
+        id="comp-webcam" 
+        title="Marco Webcam" 
+        isGlass={false} 
+        noContainer={true} 
+        defaultPos={getWidgetDefaultPos('comp-webcam')} 
+        style={{ display: isWidgetActive('webcam') ? 'flex' : 'none', position: 'relative' }}
+      >
+        <div style={{ position: 'relative', width: config?.webcamAspect === '4_3' ? '300px' : '400px', height: config?.webcamAspect === '4_3' ? '225px' : '225px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img 
+            src={config?.webcamAspect === '4_3' ? '/assets/Webcam 4_3.png' : '/assets/Webcam 16_9.png'} 
+            style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} 
+            alt="Webcam Frame" 
+          />
+        </div>
       </DraggableWidget>
 
       <ChatAvatars />

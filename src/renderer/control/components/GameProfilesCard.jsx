@@ -41,38 +41,41 @@ export default function GameProfilesCard({
           {gameProfiles.map((p, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 0', borderBottom: '1px solid var(--border-light)' }}>
               <input className="inp" style={{ width: 70, fontSize: 11 }} value={p.process} placeholder="proceso" onChange={e => {
-                const newP = [...gameProfiles]; newP[i].process = e.target.value; saveGameProfilesDebounced(newP);
+                const val = e.target.value;
+                saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, process: val } : item));
               }} />
               <input className="inp" style={{ flex: 1, fontSize: 11 }} value={p.name} placeholder="Nombre" onChange={e => {
-                const newP = [...gameProfiles]; newP[i].name = e.target.value; saveGameProfilesDebounced(newP);
+                const val = e.target.value;
+                saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, name: val } : item));
               }} />
               <div style={{ flex: 1.2, display: 'flex', gap: 4 }}>
                 <input className="inp" style={{ width: '100%', fontSize: 10 }} value={p.imageUrl || ''} placeholder="Imagen (opc)" onChange={e => {
-                  const newP = [...gameProfiles]; newP[i].imageUrl = e.target.value; saveGameProfilesDebounced(newP);
+                  const val = e.target.value;
+                  saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, imageUrl: val } : item));
                 }} />
                 <button className="btn btn-success" style={{ padding: '2px 6px' }} title="Buscar en PC" onClick={async () => {
                   const r = await window.api.selectImage();
                   if (r) {
-                    const newP = [...gameProfiles]; newP[i].imageUrl = r; saveGameProfilesDebounced(newP);
+                    saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, imageUrl: r } : item));
                   }
                 }}>🖼</button>
               </div>
               <input type="color" value={p.accent || '#1D9E75'} style={{ width: 28, height: 28, border: 'none', borderRadius: 5, cursor: 'pointer', padding: 0 }} onChange={e => {
-                const newP = [...gameProfiles]; newP[i].accent = e.target.value; saveGameProfilesDebounced(newP);
+                const val = e.target.value;
+                saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, accent: val } : item));
               }} />
               <button className={`toggle ${p.enabled ? 'on' : ''}`} onClick={() => {
-                const newP = [...gameProfiles]; newP[i].enabled = !newP[i].enabled; saveGameProfilesDebounced(newP);
+                saveGameProfilesDebounced(prev => prev.map((item, idx) => idx === i ? { ...item, enabled: !item.enabled } : item));
               }}></button>
               <button className="btn btn-danger" style={{ padding: '2px 7px' }} onClick={() => {
-                const newP = gameProfiles.filter((_, idx) => idx !== i); saveGameProfilesDebounced(newP);
+                saveGameProfilesDebounced(prev => prev.filter((_, idx) => idx !== i));
               }}>🗑</button>
             </div>
           ))}
         </div>
         <div className="flex gap-sm">
           <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
-            const newP = [...gameProfiles, { process: '', name: 'Nuevo juego', accent: '#10b981', imageUrl: '', enabled: true }];
-            saveGameProfilesDebounced(newP);
+            saveGameProfilesDebounced(prev => [...prev, { process: '', name: 'Nuevo juego', accent: '#10b981', imageUrl: '', enabled: true }]);
           }}>+ Agregar Perfil</button>
           <button className="btn btn-primary" style={{ flex: 1, background: 'var(--accent)', color: 'white' }} onClick={async (e) => {
             const btn = e.target;
@@ -84,19 +87,21 @@ export default function GameProfilesCard({
             btn.disabled = false;
             if (scanned && scanned.length > 0) {
               let added = 0;
-              const newP = [...gameProfiles];
-              scanned.forEach(game => {
-                if (!newP.some(p => p.process === game.process || p.name === game.name)) {
-                  newP.push(game);
-                  added++;
+              saveGameProfilesDebounced(prev => {
+                const newP = [...prev];
+                scanned.forEach(game => {
+                  if (!newP.some(p => p.process === game.process || p.name === game.name)) {
+                    newP.push(game);
+                    added++;
+                  }
+                });
+                if (added > 0) {
+                  setTimeout(() => alert(`¡Se encontraron y agregaron ${added} juegos nuevos de Steam!`), 50);
+                } else {
+                  setTimeout(() => alert('Se escanearon los juegos pero todos ya estaban en la lista.'), 50);
                 }
+                return newP;
               });
-              if (added > 0) {
-                saveGameProfilesDebounced(newP);
-                alert(`¡Se encontraron y agregaron ${added} juegos nuevos de Steam!`);
-              } else {
-                alert('Se escanearon los juegos pero todos ya estaban en la lista.');
-              }
             } else {
               alert('No se encontraron juegos de Steam (o Steam no está instalado).');
             }
@@ -127,16 +132,27 @@ export default function GameProfilesCard({
           {config.game.map((chip, i) => (
             <div key={chip.id || i} className="item-row" style={{ flexWrap: 'wrap', gap: 5, padding: '8px 0' }}>
               <input className="inp" style={{ width: 32, textAlign: 'center', padding: 4 }} value={chip.icon || '🎮'} onChange={(e) => {
-                const newGame = [...config.game]; newGame[i].icon = e.target.value; saveConfig({ game: newGame });
+                const val = e.target.value;
+                saveConfig(prev => ({
+                  game: prev.game.map((item, idx) => idx === i ? { ...item, icon: val } : item)
+                }));
               }} />
               <input className="inp" style={{ flex: 1, minWidth: 60 }} value={chip.label || ''} placeholder="Label (IP, Puerto...)" onChange={(e) => {
-                const newGame = [...config.game]; newGame[i].label = e.target.value; saveConfig({ game: newGame });
+                const val = e.target.value;
+                saveConfig(prev => ({
+                  game: prev.game.map((item, idx) => idx === i ? { ...item, label: val } : item)
+                }));
               }} />
               <input className="inp" style={{ flex: 1.4, minWidth: 80 }} value={chip.value || ''} placeholder="Valor" onChange={(e) => {
-                const newGame = [...config.game]; newGame[i].value = e.target.value; saveConfig({ game: newGame });
+                const val = e.target.value;
+                saveConfig(prev => ({
+                  game: prev.game.map((item, idx) => idx === i ? { ...item, value: val } : item)
+                }));
               }} />
               <button className={`toggle ${chip.visible ? 'on' : ''}`} title="Mostrar/ocultar" onClick={() => {
-                const newGame = [...config.game]; newGame[i].visible = !newGame[i].visible; saveConfig({ game: newGame });
+                saveConfig(prev => ({
+                  game: prev.game.map((item, idx) => idx === i ? { ...item, visible: !item.visible } : item)
+                }));
               }}></button>
               <button className="btn btn-danger" style={{ padding: '4px 8px' }} onClick={() => {
                 saveConfig({ game: config.game.filter((_, idx) => idx !== i) });

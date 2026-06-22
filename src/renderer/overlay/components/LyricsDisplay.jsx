@@ -17,8 +17,8 @@ export default function LyricsDisplay() {
   const flexAlign = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
 
   useEffect(() => {
-    const handler = (e) => {
-      const { prev, current, next } = e.detail || {};
+    const handler = (detail) => {
+      const { prev, current, next } = detail || {};
       const newCurrent = current || '';
       const newPrev = prev || '';
       const newNext = next || '';
@@ -50,8 +50,17 @@ export default function LyricsDisplay() {
       
       setLyrics({ prev: newPrev, current: newCurrent, next: newNext });
     };
-    window.addEventListener('lyrics-update', handler);
-    return () => window.removeEventListener('lyrics-update', handler);
+
+    let offLyrics;
+    if (window.api) {
+      offLyrics = window.api.on('local-lyrics-update', handler);
+    }
+
+    return () => {
+      if (window.api) {
+        window.api.off('local-lyrics-update', offLyrics);
+      }
+    };
   }, []);
 
   const hasLyrics = !!(lyrics.prev || lyrics.current || lyrics.next || currentText);

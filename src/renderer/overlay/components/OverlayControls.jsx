@@ -120,9 +120,13 @@ export default function OverlayControls({
         const id = el.id.replace('comp-', '');
         const cfg = await window.api.getConfig();
         if (cfg) {
-          if (!cfg.widgets) cfg.widgets = {};
-          cfg.widgets[id] = false;
-          await window.api.saveConfig({ widgets: cfg.widgets });
+          const urlParams = new URLSearchParams(window.location.search);
+          const isHorizontal = urlParams.get('type') === 'horizontal';
+          const widgetsKey = isHorizontal ? 'widgetsHorizontal' : 'widgets';
+
+          if (!cfg[widgetsKey]) cfg[widgetsKey] = {};
+          cfg[widgetsKey][id] = false;
+          await window.api.saveConfig({ [widgetsKey]: cfg[widgetsKey] });
           setConfig(cfg);
         }
         el.style.display = 'none';

@@ -147,6 +147,23 @@
     --solid-shadow: inset 0 0 20px rgba(var(--accent-rgb), 0.4);
     --font-family: 'Rajdhani', sans-serif;
   }
+
+  /* Luna Cosmic - Mystical Tarot & Ritual Gold */
+  body.theme-luna-cosmic {
+    --accent: #ffd700;
+    --accent-rgb: 255, 215, 0;
+    --bg-card: rgba(12, 10, 24, 0.75);
+    --glass-bg: linear-gradient(135deg, rgba(18, 14, 38, 0.8) 0%, rgba(10, 8, 20, 0.9) 100%);
+    --glass-border: #ffd700;
+    --glass-blur: 16px;
+    --glass-saturate: 1.3;
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(255, 215, 0, 0.25);
+    --radius-glass: 12px;
+    --radius-solid: 12px;
+    --solid-border: 1px solid #ffd700;
+    --solid-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --font-family: 'Outfit', 'Inter', sans-serif;
+  }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -2692,4 +2709,476 @@ body.remote-mode #root {
 body.remote-mode html {
   background: #000;
 }
+
+/* Platform Badges in Chat */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  margin-right: 6px;
+  vertical-align: middle;
+  transition: transform 0.2s;
+}
+.platform-badge:hover {
+  transform: scale(1.1);
+}
+.platform-badge.twitch {
+  background: rgba(145, 70, 255, 0.15);
+  color: #c299ff;
+  border: 1px solid rgba(145, 70, 255, 0.35);
+  box-shadow: 0 0 10px rgba(145, 70, 255, 0.2);
+}
+.platform-badge.tiktok {
+  background: rgba(0, 242, 254, 0.08);
+  color: #00f2fe;
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
+}
+.platform-badge svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* ══════════════════════════════════════════════════
+   HORIZONTAL TWITCH/MULTISTREAM OVERLAY (LIQUID GLASS)
+══════════════════════════════════════════════════ */
+body.horizontal-layout {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* Dot matrix blueprint background */
+body.horizontal-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgba(var(--accent-rgb), 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Hide vertical cinematic framing bar lines */
+body.horizontal-layout .bg-panel,
+body.horizontal-layout .border-line,
+body.horizontal-layout .border-corner {
+  display: none !important;
+}
+
+/* Premium Liquid Glass Styling Overrides for Horizontal 16:9 Canvas */
+body.horizontal-layout .glass {
+  background: linear-gradient(135deg, rgba(12, 12, 18, 0.4) 0%, rgba(8, 8, 12, 0.5) 100%) !important;
+  backdrop-filter: blur(22px) saturate(1.85) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    0 0 25px rgba(var(--accent-rgb), 0.04) !important;
+  border-radius: 12px !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Elegant top highlight stripe matching the selected accent color */
+body.horizontal-layout .glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.4) 100%) !important;
+  z-index: 2;
+  border-radius: 12px 12px 0 0;
+  opacity: 0.8;
+}
+
+/* Interactive Hover Spell */
+body.horizontal-layout .drag-item.glass:hover {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2),
+    0 0 35px rgba(var(--accent-rgb), 0.08) !important;
+}
+
+/* Remove old cartoon text outlines, replace with subtle premium glow dropshadows */
+body.horizontal-layout .stat-card .val,
+body.horizontal-layout .section-lbl,
+body.horizontal-layout .obj-val,
+body.horizontal-layout .timer-box,
+body.horizontal-layout #comp-game .val,
+body.horizontal-layout .chat-header {
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* 1. User Profile Widget */
+body.horizontal-layout #comp-user {
+  padding: 12px 20px;
+}
+body.horizontal-layout #comp-user h1 {
+  font-family: 'Outfit', 'Inter', sans-serif !important;
+  font-size: 26px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px !important;
+  color: #ffffff !important;
+  margin-top: 4px;
+}
+body.horizontal-layout #comp-user .live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 68, 68, 0.12) !important;
+  border: 1px solid rgba(255, 68, 68, 0.35) !important;
+  color: #ff5252 !important;
+  padding: 3px 8px !important;
+  border-radius: 20px !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  text-shadow: none !important;
+  margin-bottom: 2px;
+}
+body.horizontal-layout #comp-user .live-badge::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #ff5252;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ff5252;
+  animation: live-pulse-dot 1.5s infinite alternate;
+}
+
+/* 2. Socials Widget */
+body.horizontal-layout #comp-socials {
+  padding: 10px 14px;
+}
+body.horizontal-layout .social-pill {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #dddddd !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+body.horizontal-layout .social-pill:hover {
+  background: rgba(var(--accent-rgb), 0.12) !important;
+  border-color: rgba(var(--accent-rgb), 0.35) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.15) !important;
+}
+
+/* 3. Chat Widget */
+body.horizontal-layout #comp-chat {
+  padding: 0;
+}
+body.horizontal-layout .chat-header {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  padding: 12px 16px !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+}
+body.horizontal-layout .chat-messages {
+  padding: 12px !important;
+  gap: 10px !important;
+}
+body.horizontal-layout .chat-msg {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  transition: all 0.2s ease !important;
+  transform-origin: left bottom;
+  /* Left color code line */
+  border-left: 3px solid rgba(255, 255, 255, 0.15) !important;
+}
+body.horizontal-layout .chat-msg:has(.twitch) {
+  border-left-color: #a970ff !important;
+}
+body.horizontal-layout .chat-msg:has(.tiktok) {
+  border-left-color: #00f2fe !important;
+}
+body.horizontal-layout .chat-msg:hover {
+  transform: translateX(4px) scale(1.02) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+body.horizontal-layout .chat-msg.highlighted {
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  background: rgba(var(--accent-rgb), 0.1) !important;
+  box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.15) !important;
+}
+body.horizontal-layout .chat-msg .u {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* 4. Stats Widget */
+body.horizontal-layout #comp-stats {
+  padding: 12px 16px;
+  display: flex !important;
+  gap: 12px !important;
+}
+body.horizontal-layout #comp-stats .stat-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03) !important;
+}
+body.horizontal-layout #comp-stats .stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 15%; right: 15%; height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+body.horizontal-layout .stat-card .val {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+}
+body.horizontal-layout .stat-card .lbl {
+  font-size: 8.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+  opacity: 0.55 !important;
+  margin-top: 3px !important;
+}
+
+/* 5. Goals Widget (Objectives) */
+body.horizontal-layout #comp-objs {
+  padding: 14px 16px;
+}
+body.horizontal-layout .section-lbl {
+  font-family: 'Outfit', sans-serif !important;
+  border-left: 3px solid var(--accent) !important;
+  padding-left: 8px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.12em !important;
+  margin-bottom: 8px !important;
+}
+body.horizontal-layout .obj-card {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+body.horizontal-layout .obj-name {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #cccccc !important;
+}
+body.horizontal-layout .obj-val {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: var(--accent) !important;
+}
+body.horizontal-layout .bar-bg {
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 3px !important;
+  overflow: visible !important; /* Allow glowing white tip to render */
+  margin-top: 6px !important;
+  position: relative;
+}
+body.horizontal-layout .bar-fill {
+  background: linear-gradient(90deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.7) 100%) !important;
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5) !important;
+  border-radius: 3px !important;
+  position: relative;
+}
+/* White target indicator point at the tip of progress bar */
+body.horizontal-layout .bar-fill::after {
+  content: '';
+  position: absolute;
+  top: -2px; right: -4px; width: 10px; height: 10px;
+  background: #ffffff;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ffffff, 0 0 16px var(--accent);
+  z-index: 5;
+}
+
+/* 6. Current Game Widget */
+body.horizontal-layout #comp-game {
+  padding: 10px 18px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+}
+/* Add category sublabel above the game name */
+body.horizontal-layout #comp-game::before {
+  content: '🎮 CATEGORÍA';
+  display: block;
+  font-size: 8px;
+  font-weight: 800;
+  opacity: 0.5;
+  letter-spacing: 0.15em;
+  margin-bottom: 2px;
+  text-align: right;
+  order: -1;
+}
+body.horizontal-layout #comp-game .val {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  color: #ffffff !important;
+}
+
+/* 7. Timer Widget */
+body.horizontal-layout #comp-timers {
+  padding: 10px 14px;
+}
+body.horizontal-layout .timer-box {
+  padding: 6px 12px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 6px !important;
+}
+
+/* 8. Spotify Widget */
+body.horizontal-layout #comp-spotify .glass {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+/* 9. Poll Display Widget */
+body.horizontal-layout #comp-poll {
+  padding: 14px 16px;
+}
+body.horizontal-layout #comp-poll h3 {
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.2px;
+  margin-bottom: 10px;
+}
+body.horizontal-layout #poll-timer {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em;
+  color: var(--accent) !important;
+  text-shadow: none !important;
+  margin-top: 10px;
+}
+
+@keyframes live-pulse-dot {
+  from { opacity: 0.45; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1.1); }
+}
+
+/* ══════════════════════════════════════
+   LUNA COSMIC / TAROT PACK CUSTOM STYLES
+   ══════════════════════════════════════ */
+body.theme-luna-cosmic {
+  background-color: transparent !important;
+}
+
+body.theme-luna-cosmic .glass {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) !important;
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+  border-top: 1px solid rgba(255, 215, 0, 0.65) !important;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.75),
+    inset 0 1px 1px rgba(255, 215, 0, 0.15),
+    0 0 25px rgba(255, 215, 0, 0.04) !important;
+  border-radius: 12px !important;
+}
+
+/* Top highlight stripe in ritual gold */
+body.theme-luna-cosmic .glass::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, #ffd700 0%, #b8860b 50%, #ffd700 100%) !important;
+  z-index: 2;
+  border-radius: 12px 12px 0 0;
+  opacity: 0.9;
+}
+
+/* Floating moon phases card label ornament */
+body.theme-luna-cosmic .drag-item::after {
+  content: '✦ ☾ ✦';
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.7);
+  opacity: 0.8;
+  pointer-events: none;
+  letter-spacing: 3px;
+}
+
+/* Section label golden stars */
+body.theme-luna-cosmic .section-lbl::before {
+  content: '★ ';
+  color: #ffd700;
+  margin-right: 6px;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.8);
+}
+
+/* Chat header stars */
+body.theme-luna-cosmic .chat-header::before {
+  content: '✦ ';
+  color: #ffd700;
+  margin-right: 4px;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.8);
+}
+
+/* Chat messages color coding left line */
+body.theme-luna-cosmic .chat-msg {
+  border-left-width: 3px !important;
+}
+
+body.theme-luna-cosmic .chat-msg:has(.twitch) {
+  border-left-color: #a970ff !important;
+}
+
+body.theme-luna-cosmic .chat-msg:has(.tiktok) {
+  border-left-color: #00f2fe !important;
+}
+
+/* Scrollbars in Gold tint */
+body.theme-luna-cosmic ::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.2) !important;
+}
+
+body.theme-luna-cosmic ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.4) !important;
+}
+
 

@@ -77,12 +77,15 @@ function createControl() {
   controlWin.on('closed', () => { app.quit(); });
 }
 
+
+
 function createTray() {
   tray = new Tray(nativeImage.createEmpty());
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Control Panel', click: () => { if (!controlWin) createControl(); else controlWin.focus(); }},
-    { label: 'Mostrar Overlay', click: () => overlayWin?.show() },
-    { label: 'Ocultar Overlay', click: () => overlayWin?.hide() },
+    { type: 'separator' },
+    { label: 'Mostrar Overlay Vertical (TikTok)', click: () => overlayWin?.show() },
+    { label: 'Ocultar Overlay Vertical', click: () => overlayWin?.hide() },
     { type: 'separator' },
     { label: 'Salir', click: () => app.quit() },
   ]));

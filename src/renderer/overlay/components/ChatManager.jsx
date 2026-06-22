@@ -155,9 +155,25 @@ export default function ChatManager() {
             else if (msg.isSub) { colorClass = 'sub'; badge = '⭐ '; }
             else if (msg.isFollower) { colorClass = 'follower'; }
 
+            const platformIcon = msg.platform === 'twitch' ? (
+              <span className="platform-badge twitch" title="Twitch">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                  <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                </svg>
+              </span>
+            ) : (
+              <span className="platform-badge tiktok" title="TikTok">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                  <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.81-.74-3.94-1.69-.22-.19-.42-.38-.62-.59v7.02c0 2.54-.74 5.24-2.88 6.78-2.28 1.69-5.6 1.77-8 0-2.42-1.73-3.02-5.18-2.24-7.97.74-2.73 3.38-4.7 6.22-4.5v4.02c-1.39-.17-2.92.51-3.5 1.83-.75 1.63.14 3.82 1.85 4.38 1.67.57 3.7-.36 4.14-2.1.14-.54.12-1.1.12-1.66V0h.23z"/>
+                </svg>
+              </span>
+            );
+
             return (
               <div key={msg.id} className={`chat-msg ${msg.highlighted ? 'highlighted' : ''}`}>
-                <span className={`u ${colorClass}`} style={msg.color ? { color: msg.color } : {}}>{badge}{msg.user}: </span>
+                <span className={`u ${colorClass}`} style={msg.color ? { color: msg.color } : {}}>
+                  {platformIcon}{badge}{msg.user}: 
+                </span>
                 <span className="t">{msg.text}</span>
               </div>
             );

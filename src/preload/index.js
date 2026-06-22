@@ -39,7 +39,8 @@ contextBridge.exposeInMainWorld('api', {
       'session-updated', 'config-updated', 'tiktok-stats', 'tiktok-like',
       'item-completed', 'timer-tick', 'stream-alert', 'game-detected', 'tiktok-chat', 'media-updated', 'auto-toggle-social', 'play-soundboard', 'yt-ended', 'yt-time', 'highlight-chat',
       'yt-pause', 'yt-resume', 'yt-stop', 'yt-skip', 'yt-remove-song',
-      'queue-updated', 'move-mode', 'pin-message', 'tunnel-status'
+      'queue-updated', 'move-mode', 'pin-message', 'tunnel-status', 'twitch-status',
+      'local-song-started', 'local-media-time', 'local-lyrics-update'
     ];
     if (allowed.includes(channel)) {
       const handler = (_e, ...args) => cb(...args);
@@ -84,6 +85,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Song Requests (YouTube) ──
   searchYoutube: (query, opts) => ipcRenderer.invoke('search-youtube', { query, opts }),
+
+  // ── Local Media Playback updates ──
+  sendLocalSongStarted: (data) => ipcRenderer.send('local-song-started', data),
+  sendLocalMediaTime: (data) => ipcRenderer.send('local-media-time', data),
+  sendLocalLyricsUpdate: (data) => ipcRenderer.send('local-lyrics-update', data),
 
   // ── Soundboard ──
   playSoundboard: (id) => ipcRenderer.send('play-soundboard', id),

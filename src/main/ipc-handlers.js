@@ -112,7 +112,7 @@ function createSharedActions(tiktokService, gameDetector) {
   };
 }
 
-function registerIpcHandlers(tiktokService, gameDetector) {
+function registerIpcHandlers(tiktokService, twitchService, gameDetector) {
   const { readJSON, writeJSON, getConfig, updateConfig } = store;
   const actions = createSharedActions(tiktokService, gameDetector);
 
@@ -190,19 +190,30 @@ function registerIpcHandlers(tiktokService, gameDetector) {
   });
 
   ipcMain.on('set-move-mode', (_e, active) => {
-    const overlayWin = getOverlayWin();
-    if (!overlayWin || overlayWin.isDestroyed()) return;
-    if (active) {
-      overlayWin.setIgnoreMouseEvents(false);
-      overlayWin.setFocusable(true);
+    const windows = require('./windows');
+    const overlayWin = windows.getOverlayWin();
+    
+    [overlayWin].forEach(win => {
+      if (!win || win.isDestroyed()) return;
+      if (active) {
+        win.setIgnoreMouseEvents(false);
+        win.setFocusable(true);
+      } else {
+        win.setIgnoreMouseEvents(true, { forward: true });
+        win.setFocusable(false);
+      }
+    });
+
+    if (active && overlayWin && !overlayWin.isDestroyed()) {
       overlayWin.focus();
-    } else {
-      overlayWin.setIgnoreMouseEvents(true, { forward: true });
-      overlayWin.setFocusable(false);
     }
   });
 
   ipcMain.on('timer-tick', (_e, data) => broadcast('timer-tick', data));
+
+  ipcMain.on('local-song-started', (_e, data) => broadcast('local-song-started', data));
+  ipcMain.on('local-media-time', (_e, data) => broadcast('local-media-time', data));
+  ipcMain.on('local-lyrics-update', (_e, data) => broadcast('local-lyrics-update', data));
 
   ipcMain.on('item-completed', (_e, data) => {
     let itemName = data.itemId;
@@ -217,6 +228,9 @@ function registerIpcHandlers(tiktokService, gameDetector) {
 
   ipcMain.handle('tiktok-connect', async (_e, username) => tiktokService.connect(username));
   ipcMain.handle('tiktok-reset', () => { tiktokService.resetStats(); return true; });
+  ipcMain.handle('twitch-connect', async (_e, channel) => twitchService.connect(channel));
+  ipcMain.handle('twitch-disconnect', () => { twitchService.stop(); return true; });
+
   ipcMain.handle('toggle-auto-detect', (_e, val) => actions.toggleAutoDetect(val));
   ipcMain.handle('force-game-detect', () => { gameDetector.forceDetect(); return true; });
 
@@ -415,8 +429,8 @@ async function searchYoutubeHelper(payload) {
     // Blacklist definitions (Using module-level cache)
     const blacklist = getBlacklist();
     
-    // Filter query through filter.cleanText containing normalizations
-    const cleanQuery = filter.cleanText(query);
+    // Filter query through filter.cleanText containing normalizations (use non-strict check for searches)
+    const cleanQuery = filter.cleanText(query, false);
     if (cleanQuery.includes('*') || cleanQuery === '') {
       console.log('[SearchYT] Query blocked by filter:', query);
       return null;

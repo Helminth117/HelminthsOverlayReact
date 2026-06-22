@@ -12,11 +12,14 @@ export default function AudioManager() {
     configRef.current = config;
   }, [config]);
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const isHorizontal = urlParams.get('type') === 'horizontal';
+
   // Hook handles YouTube player playback, preloading, queue and lyrics syncing.
-  const { ytVideoId } = useSongManager();
+  const { ytVideoId } = useSongManager(isHorizontal);
 
   useEffect(() => {
-    if (!window.api) return;
+    if (isHorizontal || !window.api) return;
 
     // Register global alert sound player
     window.playAlertSound = (type) => {
@@ -52,6 +55,8 @@ export default function AudioManager() {
       if (audioRef.current) audioRef.current.pause();
     };
   }, []);
+
+  if (isHorizontal) return null;
 
   return (
     <div style={{ display: 'none' }}>

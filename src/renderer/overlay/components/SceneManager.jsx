@@ -38,11 +38,21 @@ function AnimatedCountdown({ value }) {
 
 export default function SceneManager() {
   const activeScene = useOverlayStore(s => s.config?.activeScene) || 'none';
+  const theme = useOverlayStore(s => {
+    const config = s.config;
+    const urlParams = new URLSearchParams(window.location.search);
+    const isHorizontal = urlParams.get('type') === 'horizontal';
+    return isHorizontal
+      ? (config?.themeHorizontal || 'theme-luna-cosmic')
+      : (config?.theme || 'theme-liquid-glass');
+  });
   const [displayedScene, setDisplayedScene] = useState('none');
   const [particles, setParticles] = useState([]);
   const [countdown, setCountdown] = useState('05:00');
   const [stats, setStats] = useState({ follows: '0', mvp: 'Nadie' });
   const timerRef = useRef(null);
+
+  const isCosmic = theme === 'theme-luna-cosmic';
 
   useEffect(() => {
     if (activeScene !== 'none') {
@@ -110,23 +120,28 @@ export default function SceneManager() {
   let showStats = false;
   let showCountdown = false;
 
+  let bgStyle = {};
+
   if (displayedScene === 'starting') {
     title = 'EMPEZANDO STREAM';
     subtitle = 'PREPARANDO MOTORES...';
     showCountdown = true;
+    bgStyle = {};
   } else if (displayedScene === 'brb') {
     title = 'AHORITA VUELVO';
     subtitle = 'BUSCANDO SNACKS...';
+    bgStyle = {};
   } else if (displayedScene === 'ending') {
     title = 'TRANSMISIÓN FINALIZADA';
     subtitle = '¡GRACIAS POR VER!';
     showStats = true;
+    bgStyle = {};
   }
 
   return (
     <div id="scene-container" className={activeScene !== 'none' ? 'scene-active' : 'scene-hidden'}>
-      <div className="scene-glass-bg" id="scene-bg"></div>
-      <div className="scene-particles" id="scene-particles">
+      <div className="scene-glass-bg" id="scene-bg" style={bgStyle}></div>
+      <div className="scene-particles" id="scene-particles" style={{ display: isCosmic ? 'none' : 'block' }}>
         {particles.map(p => (
           <div
             key={p.id}
@@ -141,21 +156,32 @@ export default function SceneManager() {
           />
         ))}
       </div>
-      <div className="scene-content">
-        <h1 id="scene-title" className="scene-styled-text">{title}</h1>
-        <h2 id="scene-subtitle">{subtitle}</h2>
-        <div id="scene-countdown" style={{ display: showCountdown ? 'block' : 'none' }}>
+      <div className="scene-content" style={isCosmic ? { top: '65%' } : {}}>
+        {!isCosmic && <h1 id="scene-title" className="scene-styled-text">{title}</h1>}
+        {!isCosmic && <h2 id="scene-subtitle">{subtitle}</h2>}
+        <div id="scene-countdown" style={{ display: showCountdown ? 'block' : 'none', transform: isCosmic ? 'scale(1.3)' : 'none' }}>
           <AnimatedCountdown value={countdown} />
         </div>
         
-        <div id="scene-stats" className="scene-stats-grid" style={{ display: showStats ? 'flex' : 'none' }}>
+        <div 
+          id="scene-stats" 
+          className="scene-stats-grid" 
+          style={{ 
+            display: showStats ? 'flex' : 'none', 
+            background: isCosmic ? 'rgba(12, 10, 24, 0.85)' : 'rgba(255,255,255,0.03)',
+            border: isCosmic ? '1px solid #ffd700' : '1px solid var(--border-light)',
+            boxShadow: isCosmic ? '0 0 15px rgba(255, 215, 0, 0.15)' : 'none',
+            borderRadius: isCosmic ? '12px' : '8px',
+            padding: '16px'
+          }}
+        >
           <div className="scene-stat-box">
-            <div className="scene-stat-lbl">Nuevos Seguidores</div>
-            <div className="scene-stat-val scene-styled-text" id="scene-stat-follows">{stats.follows}</div>
+            <div className="scene-stat-lbl" style={isCosmic ? { color: '#ffd700', fontWeight: 'bold' } : {}}>Nuevos Seguidores</div>
+            <div className="scene-stat-val scene-styled-text" id="scene-stat-follows" style={isCosmic ? { color: '#fff' } : {}}>{stats.follows}</div>
           </div>
           <div className="scene-stat-box">
-            <div className="scene-stat-lbl">Mayor Donador</div>
-            <div className="scene-stat-val scene-styled-text" id="scene-stat-mvp">{stats.mvp}</div>
+            <div className="scene-stat-lbl" style={isCosmic ? { color: '#ffd700', fontWeight: 'bold' } : {}}>Mayor Donador</div>
+            <div className="scene-stat-val scene-styled-text" id="scene-stat-mvp" style={isCosmic ? { color: '#fff' } : {}}>{stats.mvp}</div>
           </div>
         </div>
       </div>

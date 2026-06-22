@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useOverlayStore } from '../../store';
 import { parseLRC } from '../utils/lrcParser';
 
-export function useSongManager() {
+export function useSongManager(isDisabled = false) {
   const config = useOverlayStore(s => s.config) || {};
   const [ytVideoId, setYtVideoId] = useState(null);
 
@@ -74,6 +74,9 @@ export function useSongManager() {
         next: ''
       }
     }));
+    if (window.api?.sendLocalLyricsUpdate) {
+      window.api.sendLocalLyricsUpdate({ prev: '', current: '', next: '' });
+    }
   };
 
   const stopCurrentAudio = () => {
@@ -128,6 +131,9 @@ export function useSongManager() {
           next: nextText
         }
       }));
+      if (window.api?.sendLocalLyricsUpdate) {
+        window.api.sendLocalLyricsUpdate({ prev: prevText, current: currentText, next: nextText });
+      }
     }
   };
 
@@ -237,6 +243,7 @@ export function useSongManager() {
       currentSong.current = null;
       currentLyrics.current = [];
       window.dispatchEvent(new CustomEvent('song-started', { detail: null }));
+      if (window.api?.sendLocalSongStarted) window.api.sendLocalSongStarted(null);
       if (window.api?.ytStop) window.api.ytStop();
       clearLyrics();
       return;
@@ -341,6 +348,15 @@ export function useSongManager() {
             duration: video.seconds || 0
           }
         }));
+        if (window.api?.sendLocalSongStarted) {
+          window.api.sendLocalSongStarted({
+            title: next.title,
+            artist: next.artist,
+            requester: next.user,
+            thumbnail: artSrc,
+            duration: video.seconds || 0
+          });
+        }
 
         if (streamUrl) {
           stopCurrentAudio();
@@ -363,6 +379,12 @@ export function useSongManager() {
                 duration: audio.duration
               }
             }));
+            if (window.api?.sendLocalMediaTime) {
+              window.api.sendLocalMediaTime({
+                current: audio.currentTime,
+                duration: audio.duration
+              });
+            }
             syncLyrics(audio.currentTime);
           };
 
@@ -430,7 +452,7 @@ export function useSongManager() {
   };
 
   useEffect(() => {
-    if (!window.api) return;
+    if (isDisabled || !window.api) return;
 
     const handlerPlayYt = window.api.on('play-yt', (data) => {
       if (data && data.videoId) {
@@ -463,6 +485,7 @@ export function useSongManager() {
       ytIsPaused.current = true;
       stopCurrentAudio();
       window.dispatchEvent(new CustomEvent('song-started', { detail: null }));
+      if (window.api?.sendLocalSongStarted) window.api.sendLocalSongStarted(null);
       broadcastQueue();
       clearLyrics();
     };
@@ -495,6 +518,12 @@ export function useSongManager() {
           duration: total || 0
         }
       }));
+      if (window.api?.sendLocalMediaTime) {
+        window.api.sendLocalMediaTime({
+          current: current || 0,
+          duration: total || 0
+        });
+      }
       syncLyrics(current || 0);
     };
 

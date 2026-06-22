@@ -65,10 +65,9 @@ export default function WinIsland() {
     };
   }, []);
 
-  // Listen to local song request manager events
+  // Listen to local song request manager events via IPC
   useEffect(() => {
-    const handleSongStarted = (e) => {
-      const detail = e.detail;
+    const handleSongStarted = (detail) => {
       if (detail) {
         setLocalActive(true);
         setMediaInfo({
@@ -88,9 +87,9 @@ export default function WinIsland() {
       }
     };
 
-    const handleTimeUpdate = (e) => {
+    const handleTimeUpdate = (detail) => {
       if (!localActiveRef.current) return;
-      const { current, duration } = e.detail || {};
+      const { current, duration } = detail || {};
       setMediaInfo(prev => ({
         ...prev,
         current: current || 0,
@@ -110,20 +109,18 @@ export default function WinIsland() {
       }
     };
 
-    window.addEventListener('song-started', handleSongStarted);
-    window.addEventListener('media-time-update', handleTimeUpdate);
-    
-    // Listen to player window IPC broadcasts forwarders
-    let ipcPause, ipcResume;
+    let offSongStarted, offTimeUpdate, ipcPause, ipcResume;
     if (window.api) {
+      offSongStarted = window.api.on('local-song-started', handleSongStarted);
+      offTimeUpdate = window.api.on('local-media-time', handleTimeUpdate);
       ipcPause = window.api.on('yt-pause', handleYtPause);
       ipcResume = window.api.on('yt-resume', handleYtResume);
     }
 
     return () => {
-      window.removeEventListener('song-started', handleSongStarted);
-      window.removeEventListener('media-time-update', handleTimeUpdate);
       if (window.api) {
+        window.api.off('local-song-started', offSongStarted);
+        window.api.off('local-media-time', offTimeUpdate);
         window.api.off('yt-pause', ipcPause);
         window.api.off('yt-resume', ipcResume);
       }

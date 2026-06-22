@@ -76,7 +76,10 @@ const mediaDetector = new MediaDetector(broadcast);
 const TikTokService = require('./tiktok-service');
 const tiktokService = new TikTokService(broadcast, getConfig);
 
-ipcHandlers.registerIpcHandlers(tiktokService, gameDetector);
+const TwitchService = require('./twitch-service');
+const twitchService = new TwitchService(broadcast);
+
+ipcHandlers.registerIpcHandlers(tiktokService, twitchService, gameDetector);
 
 // ── App lifecycle ──
 app.whenReady().then(() => {
@@ -135,6 +138,12 @@ app.whenReady().then(() => {
     
     // start game detector
     gameDetector.start();
+
+    // start twitch service auto-connect if channel is configured
+    const twitchChannel = getConfig().twitchChannel;
+    if (twitchChannel) {
+      twitchService.connect(twitchChannel);
+    }
   });
 });
 

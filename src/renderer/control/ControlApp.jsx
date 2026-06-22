@@ -4,6 +4,8 @@ import ObjectivesManager from './components/ObjectivesManager';
 import HistoryManager from './components/HistoryManager';
 import LiveDashboard from './components/LiveDashboard';
 import OverlaySettings from './components/OverlaySettings';
+import PollsManager from './components/PollsManager';
+import styles from './ControlApp.module.css';
 
 
 const PRIO_ORDER = { alto: 0, medio: 1, bajo: 2, none: 3 };
@@ -122,8 +124,9 @@ export default function ControlApp() {
   const configTimerRef = useRef(null);
   const profilesTimerRef = useRef(null);
 
-  const saveConfig = useCallback((partial) => {
+  const saveConfig = useCallback((partialOrFn) => {
     setConfig(prev => {
+      const partial = typeof partialOrFn === 'function' ? partialOrFn(prev) : partialOrFn;
       const newConfig = { ...prev, ...partial };
       if (configTimerRef.current) clearTimeout(configTimerRef.current);
       configTimerRef.current = setTimeout(() => {
@@ -134,12 +137,15 @@ export default function ControlApp() {
     showSaved();
   }, []);
 
-  const saveGameProfilesDebounced = useCallback((newP) => {
-    setGameProfiles(newP);
-    if (profilesTimerRef.current) clearTimeout(profilesTimerRef.current);
-    profilesTimerRef.current = setTimeout(() => {
-      window.api.saveGameProfiles(newP);
-    }, 500);
+  const saveGameProfilesDebounced = useCallback((updateFnOrNewP) => {
+    setGameProfiles(prev => {
+      const next = typeof updateFnOrNewP === 'function' ? updateFnOrNewP(prev) : updateFnOrNewP;
+      if (profilesTimerRef.current) clearTimeout(profilesTimerRef.current);
+      profilesTimerRef.current = setTimeout(() => {
+        window.api.saveGameProfiles(next);
+      }, 500);
+      return next;
+    });
   }, []);
 
   const refreshAudioDevices = async () => {
@@ -172,7 +178,6 @@ export default function ControlApp() {
     if (!cfg.social || cfg.social.length === 0) {
       cfg.social = [
         { id:'tiktok', icon:'tiktok', handle:'', visible:false },
-        { id:'twitch', icon:'twitch', handle:'', visible:false },
         { id:'youtube', icon:'youtube', handle:'', visible:false },
         { id:'discord', icon:'discord', handle:'', visible:false }
       ];
@@ -419,37 +424,43 @@ export default function ControlApp() {
   };
 
   // Rendering helpers
-  const WIDGET_LABELS = { frame: 'Marco Live', user: 'Nombre/Live', socials: 'Redes', stats: 'Stats TikTok', topevents: 'Top Eventos', objs: 'Objetivos', timers: 'Reloj', game: 'Juego', chips: 'Datos Juego', chat: 'Caja Chat', 'pinned-chat': 'Mensaje Fijado', visualizer: 'Visualizador', spotify: 'Spotify / Web', media: 'Música Local', lyrics: 'Letras', 'chat-avatars': 'Avatares Chat', combo: 'Combos de Likes' };
+  const WIDGET_LABELS = { frame: 'Marco Live', user: 'Nombre/Live', socials: 'Redes', stats: 'Stats TikTok', topevents: 'Top Eventos', objs: 'Objetivos', timers: 'Reloj', game: 'Juego', chips: 'Datos Juego', chat: 'Caja Chat', 'pinned-chat': 'Mensaje Fijado', visualizer: 'Visualizador', spotify: 'Spotify / Web', media: 'Música Local', lyrics: 'Letras', 'chat-avatars': 'Avatares Chat', combo: 'Combos de Likes', poll: 'Encuestas', webcam: 'Marco Webcam' };
 
   return (
-    <div className="app-container">
+    <div className={styles.appContainer}>
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
-        <div className="brand-section">
+      <aside className={styles.sidebar}>
+        <div className={styles.brandSection}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
             <line x1="8" y1="21" x2="16" y2="21"></line>
             <line x1="12" y1="17" x2="12" y2="21"></line>
           </svg>
-          <span className="brand-title">STREAM OVERLAY</span>
+          <span className={styles.brandTitle}>STREAM OVERLAY</span>
         </div>
         
-        <nav className="sidebar-nav">
-          <button className={`sidebar-btn ${activeTab === 'live' ? 'active' : ''}`} onClick={() => setActiveTab('live')}>
+        <nav className={styles.sidebarNav}>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'live' ? styles.active : ''}`} onClick={() => setActiveTab('live')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="2"></circle>
               <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
             </svg>
             En Vivo
           </button>
-          <button className={`sidebar-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'encuestas' ? styles.active : ''}`} onClick={() => setActiveTab('encuestas')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 20V4M12 20v-8M6 20v-4"/>
+            </svg>
+            Encuestas
+          </button>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'settings' ? styles.active : ''}`} onClick={() => setActiveTab('settings')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
             Ajustes
           </button>
-          <button className={`sidebar-btn ${activeTab === 'objetivos' ? 'active' : ''}`} onClick={() => setActiveTab('objetivos')}>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'objetivos' ? styles.active : ''}`} onClick={() => setActiveTab('objetivos')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <circle cx="12" cy="12" r="6"></circle>
@@ -457,7 +468,7 @@ export default function ControlApp() {
             </svg>
             Objetivos
           </button>
-          <button className={`sidebar-btn ${activeTab === 'juegos' ? 'active' : ''}`} onClick={() => setActiveTab('juegos')}>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'juegos' ? styles.active : ''}`} onClick={() => setActiveTab('juegos')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="6" y1="12" x2="10" y2="12"></line>
               <line x1="8" y1="10" x2="8" y2="14"></line>
@@ -467,7 +478,7 @@ export default function ControlApp() {
             </svg>
             Videojuegos
           </button>
-          <button className={`sidebar-btn ${activeTab === 'historial' ? 'active' : ''}`} onClick={() => setActiveTab('historial')}>
+          <button className={`${styles.sidebarBtn} ${activeTab === 'historial' ? styles.active : ''}`} onClick={() => setActiveTab('historial')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
@@ -478,17 +489,17 @@ export default function ControlApp() {
       </aside>
 
       {/* Main Content Pane */}
-      <div className="content-area">
+      <div className={styles.contentArea}>
         {/* Header */}
         <header className="flex items-center justify-between mb-md">
           <h1 style={{ marginBottom: 0 }}>
-            <div className={`status-dot ${ttStatus.state === 'connected' ? 'live' : (ttStatus.state === 'waiting' ? 'online' : '')}`} id="conn-dot"></div>
+            <div className={`${styles.statusDot} ${ttStatus.state === 'connected' ? styles.live : (ttStatus.state === 'waiting' ? styles.online : '')}`} id="conn-dot"></div>
             <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.3px', background: 'none', WebkitTextFillColor: 'var(--text-primary)' }}>
               {ttStatus.state === 'connected' ? `LIVE: @${ttStatus.username}` : (ttStatus.state === 'waiting' ? `ESPERANDO LIVE: @${ttStatus.username}` : 'MODO SIN CONEXIÓN')}
             </span>
           </h1>
           <div className="flex items-center gap-sm">
-            <span className={`save-ind ${saveInd ? 'show' : ''}`} id="save-ind">Guardado</span>
+            <span className={`${styles.saveInd} ${saveInd ? styles.show : ''}`} id="save-ind">Guardado</span>
             
             {tunnelStatus === 'connecting' && <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginRight: '4px' }}>⏳ Creando enlace seguro...</span>}
             {tunnelStatus === 'online' && <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✓ Enlace Seguro Listo</span>}
@@ -535,7 +546,7 @@ export default function ControlApp() {
           </div>
         </header>
 
-        <div className="move-alert">⚠ MODO MOVIMIENTO ACTIVO</div>
+        {config.moveMode && <div className={styles.moveAlert}>⚠ MODO MOVIMIENTO ACTIVO</div>}
 
         {qrModal.open && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -572,6 +583,15 @@ export default function ControlApp() {
           timerSwitchMode={timerSwitchMode}
           timerReset={timerReset}
           applyCountdown={applyCountdown}
+        />
+
+        {/* ENCUESTAS TAB */}
+        <PollsManager
+          activeTab={activeTab}
+          poll={poll}
+          setPoll={setPoll}
+          isPollActive={isPollActive}
+          setIsPollActive={setIsPollActive}
         />
 
         {/* SETTINGS TAB */}

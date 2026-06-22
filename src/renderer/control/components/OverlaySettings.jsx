@@ -21,7 +21,9 @@ const WIDGET_LABELS = {
   media: 'Música Local', 
   lyrics: 'Letras', 
   'chat-avatars': 'Avatares Chat', 
-  combo: 'Combos de Likes' 
+  combo: 'Combos de Likes',
+  poll: 'Encuestas',
+  webcam: 'Marco Webcam'
 };
 
 export default function OverlaySettings({
@@ -36,6 +38,7 @@ export default function OverlaySettings({
   const [widgetOptsOpen, setWidgetOptsOpen] = useState({});
   const [voices, setVoices] = useState([]);
 
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       const updateVoices = () => {
@@ -46,6 +49,8 @@ export default function OverlaySettings({
       window.speechSynthesis.onvoiceschanged = updateVoices;
     }
   }, []);
+
+
 
   const testVoiceLocal = () => {
     const customText = document.getElementById('custom-tts-test-input')?.value?.trim();
@@ -84,12 +89,16 @@ export default function OverlaySettings({
                 <rect x="14" y="14" width="7" height="7"></rect>
                 <rect x="3" y="14" width="7" height="7"></rect>
               </svg>
-              Visibilidad de Widgets
+              Visibilidad (Vertical 9:16)
             </h2>
+
             <div className="flex-col gap-xs">
               {Object.keys(WIDGET_LABELS).map(id => {
                 const isOpen = widgetOptsOpen[id];
-                const wActive = config.widgets[id] !== false;
+                const widgetsKey = 'widgets';
+                const layoutKey = 'layout';
+
+                const wActive = (config[widgetsKey] || {})[id] !== false;
                 const gActive = config.glassWidgets[id] !== false;
                 const align = config.textAlign[id] || 'left';
                 return (
@@ -98,17 +107,17 @@ export default function OverlaySettings({
                       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{WIDGET_LABELS[id]}</span>
                       <div className="flex items-center gap-sm">
                         <button className="btn btn-ghost" title="Opciones" onClick={(e) => { e.stopPropagation(); setWidgetOptsOpen(p => ({ ...p, [id]: !p[id] })); }} style={{ padding: '4px 8px', fontSize: 11 }}>⚙️</button>
-                        <button className={`toggle ${wActive ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); saveConfig({ widgets: { ...config.widgets, [id]: !wActive } }); }}></button>
+                        <button className={`toggle ${wActive ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); saveConfig({ [widgetsKey]: { ...(config[widgetsKey] || {}), [id]: !wActive } }); }}></button>
                       </div>
                     </div>
                     {isOpen && (
                       <div style={{ padding: '0 12px 12px 12px' }}>
                         <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 12 }} className="flex-col gap-sm">
                           <button className="btn btn-ghost w-full" onClick={() => {
-                            const newLayout = { ...(config.layout || { modules: {} }) };
+                            const newLayout = { ...(config[layoutKey] || { modules: {} }) };
                             if (!newLayout.modules) newLayout.modules = {};
-                            newLayout.modules['comp-' + id] = { l: '40vw', t: '40vh', w: '', h: '', z: '999' };
-                            saveConfig({ layout: newLayout, widgets: { ...config.widgets, [id]: true } });
+                            newLayout.modules['comp-' + id] = { l: isHoriz ? '45vw' : '40vw', t: isHoriz ? '40vh' : '40vh', w: '', h: '', z: '999' };
+                            saveConfig({ [layoutKey]: newLayout, [widgetsKey]: { ...(config[widgetsKey] || {}), [id]: true } });
                           }} style={{ fontSize: 11 }}>⌖ Centrar en pantalla</button>
                           <div className="flex items-center justify-between mt-xs">
                             <div className="flex items-center gap-xs">
@@ -126,6 +135,20 @@ export default function OverlaySettings({
                               </div>
                             </div>
                           </div>
+                          {id === 'webcam' && (
+                            <div className="flex items-center justify-between mt-sm" style={{ borderTop: '1px dashed var(--border-light)', paddingTop: 10 }}>
+                              <span className="text-xs text-secondary font-bold">Formato de Webcam</span>
+                              <select 
+                                className="inp" 
+                                style={{ padding: '2px 8px', fontSize: 11, width: 'auto', height: '28px', minWidth: '120px' }}
+                                value={config.webcamAspect || '16_9'} 
+                                onChange={(e) => saveConfig({ webcamAspect: e.target.value })}
+                              >
+                                <option value="16_9">16:9 (Horizontal)</option>
+                                <option value="4_3">4:3 (Casi Cuadrado)</option>
+                              </select>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -192,7 +215,9 @@ export default function OverlaySettings({
             </div>
 
             <div className="flex-col gap-xs mt-sm">
-              <label className="text-xs text-secondary">Tema del Overlay:</label>
+              <label className="text-xs text-secondary">
+                Tema del Overlay:
+              </label>
               <select value={config.theme || 'theme-liquid-glass'} onChange={(e) => saveConfig({ theme: e.target.value })} className="inp">
                 <option value="theme-liquid-glass">Liquid Glass (Elegante y Cristalino)</option>
                 <option value="theme-liquid-glass-expanded">Liquid Glass Expanded (Refraction Style)</option>
@@ -203,6 +228,7 @@ export default function OverlaySettings({
                 <option value="theme-synthwave">Synthwave (Neón Retrowave)</option>
                 <option value="theme-obsidian">Obsidian Gold (Lujo Oscuro Premium)</option>
                 <option value="theme-holographic">Holographic (HUD Sci-Fi Avanzado)</option>
+                <option value="theme-luna-cosmic">Luna Cosmic (Mystical Tarot & Oro)</option>
               </select>
             </div>
 
@@ -282,6 +308,8 @@ export default function OverlaySettings({
       {/* ── INTEGRACIONES SUBTAB ── */}
       {activeSubTab === 'integraciones' && (
         <section className="sub-view active">
+
+
           {/* TikTok Live Goals */}
           <div className="card">
             <h2>Meta de Seguidores</h2>
@@ -298,10 +326,13 @@ export default function OverlaySettings({
               {config.social.map((s, i) => (
                 <div key={s.uid || s.id} className="list-item flex" style={{ alignItems: 'center', gap: 8, padding: '8px 12px' }}>
                   <select className="inp" style={{ width: 110, fontSize: 11, padding: '4px 8px', height: 28 }} value={s.icon} onChange={(e) => {
-                    const newSoc = [...config.social]; newSoc[i].icon = e.target.value; saveConfig({ social: newSoc });
+                    const val = e.target.value;
+                    saveConfig(prev => ({
+                      social: prev.social.map((item, idx) => idx === i ? { ...item, icon: val } : item)
+                    }));
                   }}>
                     <option value="tiktok">TikTok</option>
-                    <option value="twitch">Twitch</option>
+
                     <option value="youtube">YouTube</option>
                     <option value="discord">Discord</option>
                     <option value="instagram">Instagram</option>
@@ -310,10 +341,15 @@ export default function OverlaySettings({
                     <option value="globe">Personalizado</option>
                   </select>
                   <input className="inp flex-1" type="text" value={s.handle} placeholder="usuario / link..." style={{ fontSize: 12, height: 28, padding: '4px 8px' }} onChange={(e) => {
-                    const newSoc = [...config.social]; newSoc[i].handle = e.target.value; saveConfig({ social: newSoc });
+                    const val = e.target.value;
+                    saveConfig(prev => ({
+                      social: prev.social.map((item, idx) => idx === i ? { ...item, handle: val } : item)
+                    }));
                   }} />
                   <button className={`toggle ${s.visible ? 'on' : ''}`} onClick={() => {
-                    const newSoc = [...config.social]; newSoc[i].visible = !newSoc[i].visible; saveConfig({ social: newSoc });
+                    saveConfig(prev => ({
+                      social: prev.social.map((item, idx) => idx === i ? { ...item, visible: !item.visible } : item)
+                    }));
                   }}></button>
                   <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: 12, height: 28 }} onClick={() => {
                     saveConfig({ social: config.social.filter(x => x !== s) });
