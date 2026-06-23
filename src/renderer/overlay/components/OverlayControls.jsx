@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
+import { LayoutContext } from '../LayoutContext';
 
 let confetiFrame;
 function launchConfeti() {
@@ -41,6 +42,8 @@ export default function OverlayControls({
   isMoving,
   setConfig
 }) {
+  const { saveLayout } = useContext(LayoutContext) || {};
+
   useEffect(() => {
     if (!window.api) return;
 
@@ -84,7 +87,7 @@ export default function OverlayControls({
       if (el) {
         window.highestZ = (window.highestZ || 350) + 1;
         el.style.zIndex = window.highestZ;
-        if (window.saveLayout) window.saveLayout();
+        if (saveLayout) saveLayout();
       }
     };
 
@@ -94,7 +97,7 @@ export default function OverlayControls({
       if (el) {
         window.lowestZ = (window.lowestZ || 10) - 1;
         el.style.zIndex = window.lowestZ;
-        if (window.saveLayout) window.saveLayout();
+        if (saveLayout) saveLayout();
       }
     };
 

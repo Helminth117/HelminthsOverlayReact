@@ -1,6 +1,7 @@
 /* ControlApp.module.css */
 
 .appContainer {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   display: grid;
   grid-template-columns: 240px 1fr;
   width: 100vw;
@@ -155,7 +156,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 68px;
+    height: calc(68px + var(--safe-area-bottom, 0px)) !important;
+    padding-bottom: var(--safe-area-bottom, 0px) !important;
     z-index: 1000;
     background: rgba(18, 18, 24, 0.85) !important;
     backdrop-filter: blur(12px);
@@ -218,7 +220,7 @@
   }
   
   .contentArea {
-    padding: var(--space-md) var(--space-md) 84px var(--space-md) !important;
+    padding: var(--space-md) var(--space-md) calc(90px + var(--safe-area-bottom, 0px)) var(--space-md) !important;
     height: 100vh !important;
     overflow-y: auto !important;
   }

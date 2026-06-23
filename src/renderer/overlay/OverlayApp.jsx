@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useOverlayStore } from '../store';
+import { LayoutContext } from './LayoutContext';
 import { SVGS } from './constants';
 import { Eye, Heart, Share2, LogIn, Crown, Trophy, Bot, Gamepad2, UserPlus, Gift, Bell, HelpCircle } from 'lucide-react';
 
@@ -47,6 +48,8 @@ import TimerDisplay from './components/TimerDisplay';
 import OverlayBackground from './components/OverlayBackground';
 import OverlayControls from './components/OverlayControls';
 import ChatAvatars from './components/ChatAvatars';
+import MinecraftWidget from './components/MinecraftWidget';
+import VideoReactionWidget from './components/VideoReactionWidget';
 const getOverlayImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('local-file://')) {
@@ -68,6 +71,123 @@ export default function OverlayApp() {
   const [bgImage, setBgImage] = useState('');
   const [bgFading, setBgFading] = useState(false);
   const [activeWidget, setActiveWidget] = useState(null);
+
+  const saveLayoutTimeoutRef = useRef(null);
+
+  const isolateWidgetsAbs = useCallback(() => {
+    document.querySelectorAll('.drag-item').forEach(el => {
+      const computed = window.getComputedStyle(el);
+      if (computed.display === 'none') return;
+      
+      const rightStr = computed.right;
+      const bottomStr = computed.bottom;
+      const leftStr = computed.left;
+      const topStr = computed.top;
+      
+      let newLeft = parseFloat(leftStr);
+      let newTop = parseFloat(topStr);
+      
+      if (isNaN(newLeft) || leftStr === 'auto') {
+        const r = parseFloat(rightStr) || 0;
+        newLeft = window.innerWidth - r - el.offsetWidth;
+      }
+      if (isNaN(newTop) || topStr === 'auto') {
+        const b = parseFloat(bottomStr) || 0;
+        newTop = window.innerHeight - b - el.offsetHeight;
+      }
+
+      el.style.left = (isNaN(newLeft) ? 0 : newLeft) + 'px';
+      el.style.top = (isNaN(newTop) ? 0 : newTop) + 'px';
+      el.style.setProperty('right', 'auto', 'important');
+      el.style.setProperty('bottom', 'auto', 'important');
+    });
+  }, []);
+
+  const syncCorners = useCallback(() => {
+    requestAnimationFrame(() => {
+      const lt = document.getElementById('line-top');
+      const lb = document.getElementById('line-bottom');
+      if (!lt || !lb) return;
+      const tR = lt.getBoundingClientRect();
+      const bR = lb.getBoundingClientRect();
+      const o = 5;
+      [
+        ['corner-tl', tR.top - o, tR.left - o],
+        ['corner-tr', tR.top - o, tR.right - o],
+        ['corner-bl', bR.top - o, bR.left - o],
+        ['corner-br', bR.top - o, bR.right - o]
+      ].forEach(([id, top, left]) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.top = top + 'px';
+          el.style.left = left + 'px';
+          el.style.right = 'auto';
+          el.style.bottom = 'auto';
+        }
+      });
+    });
+  }, []);
+
+  const saveLayout = useCallback(() => {
+    clearTimeout(saveLayoutTimeoutRef.current);
+    saveLayoutTimeoutRef.current = setTimeout(async () => {
+      if (!window.api) return;
+      const cfg = await window.api.getConfig();
+      if (!cfg) return;
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const isHorizontal = urlParams.get('type') === 'horizontal';
+      const layoutKey = isHorizontal ? 'layoutHorizontal' : 'layout';
+      
+      const layout = cfg[layoutKey] || { modules: {}, borders: {} };
+      if (!layout.modules) layout.modules = {};
+      if (!layout.borders) layout.borders = {};
+      
+      document.querySelectorAll('.drag-item').forEach(el => {
+        if (!el.id) return;
+        const d = {
+          w: el.style.width,
+          h: el.style.height,
+          z: el.style.zIndex || ''
+        };
+        
+        const computed = window.getComputedStyle(el);
+        const exactTop = parseFloat(computed.top);
+        const exactLeft = parseFloat(computed.left);
+        
+        if (!isNaN(exactTop) && !isNaN(exactLeft)) {
+          d.t = exactTop + 'px';
+          d.l = exactLeft + 'px';
+          
+          el.style.left = d.l;
+          el.style.setProperty('right', 'auto', 'important');
+          el.style.top = d.t;
+          el.style.setProperty('bottom', 'auto', 'important');
+        } else if (layout.modules[el.id]) {
+          const prev = layout.modules[el.id];
+          if (prev.t !== undefined) d.t = prev.t;
+          if (prev.l !== undefined) d.l = prev.l;
+          if (prev.b !== undefined) d.b = prev.b;
+          if (prev.r !== undefined) d.r = prev.r;
+        }
+        
+        layout.modules[el.id] = d;
+      });
+      
+      const lt = document.getElementById('line-top');
+      const lb = document.getElementById('line-bottom');
+      if (lt) layout.borders.top = lt.style.top;
+      if (lb) layout.borders.bottom = lb.style.bottom;
+      
+      await window.api.saveConfig({ [layoutKey]: layout });
+      setConfig({ ...cfg, [layoutKey]: layout });
+    }, 500);
+  }, [setConfig]);
+
+  useEffect(() => {
+    window.addEventListener('resize', syncCorners);
+    return () => window.removeEventListener('resize', syncCorners);
+  }, [syncCorners]);
 
   const urlParams = new URLSearchParams(window.location.search);
   const isHorizontal = urlParams.get('type') === 'horizontal';
@@ -97,13 +217,15 @@ export default function OverlayApp() {
       'comp-stats': { t: '230px', l: '20px' },
       'comp-objs': { t: '320px', l: '20px' },
       'comp-timers': { t: '430px', l: '20px' },
+      'comp-minecraft': { t: '490px', l: '20px' },
       'comp-game': { t: '20px', r: '20px' },
-      'comp-chat': { t: '520px', l: '20px', w: '350px', h: '300px' },
+      'comp-chat': { t: '560px', l: '20px', w: '350px', h: '300px' },
       'comp-visualizer': { b: '20px', l: '20px' },
       'comp-spotify': { b: '100px', r: '20px' },
       'comp-local-media': { b: '20px', r: '20px' },
       'comp-poll': { t: '520px', r: '20px', w: '300px' },
       'comp-webcam': { t: '200px', l: '20px', w: '300px', h: '170px' },
+      'comp-video-reaction': { t: '200px', r: '20px', w: '480px', h: '290px' },
     };
 
     const horizontalDefaults = {
@@ -114,77 +236,20 @@ export default function OverlayApp() {
       'comp-stats': { t: '90px', r: '20px', w: '260px' },
       'comp-objs': { b: '30px', l: '240px', w: '400px' },
       'comp-timers': { t: '220px', r: '20px', w: '180px' },
+      'comp-minecraft': { t: '220px', l: '370px', w: '180px' },
       'comp-topevents': { t: '300px', r: '20px', w: '180px' },
       'comp-visualizer': { b: '20px', l: '20px' },
       'comp-spotify': { b: '30px', r: '20px', w: '300px', h: '80px' },
       'comp-local-media': { b: '130px', r: '20px', w: '300px' },
       'comp-poll': { t: '380px', l: '20px', w: '320px' },
       'comp-webcam': { t: '90px', l: '370px', w: '350px', h: '220px' },
+      'comp-video-reaction': { t: '90px', l: '370px', w: '480px', h: '290px' },
     };
 
     return isHorizontal ? (horizontalDefaults[id] || { t: '100px', l: '100px' }) : (verticalDefaults[id] || { t: '100px', l: '100px' });
   };
 
-  useEffect(() => {
-    window.isolateWidgetsAbs = () => {
-      let changed = false;
-      document.querySelectorAll('.drag-item').forEach(el => {
-        const computed = window.getComputedStyle(el);
-        if (computed.display === 'none') return;
-        
-        const rightStr = computed.right;
-        const bottomStr = computed.bottom;
-        const leftStr = computed.left;
-        const topStr = computed.top;
-        
-        let newLeft = parseFloat(leftStr);
-        let newTop = parseFloat(topStr);
-        
-        if (isNaN(newLeft) || leftStr === 'auto') {
-          const r = parseFloat(rightStr) || 0;
-          newLeft = window.innerWidth - r - el.offsetWidth;
-        }
-        if (isNaN(newTop) || topStr === 'auto') {
-          const b = parseFloat(bottomStr) || 0;
-          newTop = window.innerHeight - b - el.offsetHeight;
-        }
-
-        el.style.left = (isNaN(newLeft) ? 0 : newLeft) + 'px';
-        el.style.top = (isNaN(newTop) ? 0 : newTop) + 'px';
-        el.style.setProperty('right', 'auto', 'important');
-        el.style.setProperty('bottom', 'auto', 'important');
-        changed = true;
-      });
-    };
-
-    window.syncCorners = () => {
-      requestAnimationFrame(() => {
-        const lt = document.getElementById('line-top');
-        const lb = document.getElementById('line-bottom');
-        if (!lt || !lb) return;
-        const tR = lt.getBoundingClientRect();
-        const bR = lb.getBoundingClientRect();
-        const o = 5;
-        [
-          ['corner-tl', tR.top - o, tR.left - o],
-          ['corner-tr', tR.top - o, tR.right - o],
-          ['corner-bl', bR.top - o, bR.left - o],
-          ['corner-br', bR.top - o, bR.right - o]
-        ].forEach(([id, top, left]) => {
-          const el = document.getElementById(id);
-          if (el) {
-            el.style.top = top + 'px';
-            el.style.left = left + 'px';
-            el.style.right = 'auto';
-            el.style.bottom = 'auto';
-          }
-        });
-      });
-    };
-    
-    window.addEventListener('resize', window.syncCorners);
-    return () => window.removeEventListener('resize', window.syncCorners);
-  }, []);
+  // Layout helpers are now useCallbacks
 
   const [apiReady, setApiReady] = useState(!!window.api);
 
@@ -219,63 +284,6 @@ export default function OverlayApp() {
     fetchConfig();
     window.addEventListener('api-connected', fetchConfig);
 
-    let _saveLayoutTimeout;
-    window.saveLayout = () => {
-      clearTimeout(_saveLayoutTimeout);
-      _saveLayoutTimeout = setTimeout(async () => {
-        if (!window.api) return;
-        const cfg = await window.api.getConfig();
-        if (!cfg) return;
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const isHorizontal = urlParams.get('type') === 'horizontal';
-        const layoutKey = isHorizontal ? 'layoutHorizontal' : 'layout';
-        
-        const layout = cfg[layoutKey] || { modules: {}, borders: {} };
-        if (!layout.modules) layout.modules = {};
-        if (!layout.borders) layout.borders = {};
-        
-        document.querySelectorAll('.drag-item').forEach(el => {
-          if (!el.id) return;
-          const d = {
-            w: el.style.width,
-            h: el.style.height,
-            z: el.style.zIndex || ''
-          };
-          
-          const computed = window.getComputedStyle(el);
-          const exactTop = parseFloat(computed.top);
-          const exactLeft = parseFloat(computed.left);
-          
-          if (!isNaN(exactTop) && !isNaN(exactLeft)) {
-            d.t = exactTop + 'px';
-            d.l = exactLeft + 'px';
-            
-            el.style.left = d.l;
-            el.style.setProperty('right', 'auto', 'important');
-            el.style.top = d.t;
-            el.style.setProperty('bottom', 'auto', 'important');
-          } else if (layout.modules[el.id]) {
-            const prev = layout.modules[el.id];
-            if (prev.t !== undefined) d.t = prev.t;
-            if (prev.l !== undefined) d.l = prev.l;
-            if (prev.b !== undefined) d.b = prev.b;
-            if (prev.r !== undefined) d.r = prev.r;
-          }
-          
-          layout.modules[el.id] = d;
-        });
-        
-        const lt = document.getElementById('line-top');
-        const lb = document.getElementById('line-bottom');
-        if (lt) layout.borders.top = lt.style.top;
-        if (lb) layout.borders.bottom = lb.style.bottom;
-        
-        await window.api.saveConfig({ [layoutKey]: layout });
-        setConfig({ ...cfg, [layoutKey]: layout });
-      }, 500);
-    };
-
     const handlers = {
       'config-updated': (cfg) => {
         if (cfg) setConfig(cfg);
@@ -285,6 +293,11 @@ export default function OverlayApp() {
       },
       'timer-tick': (data) => {
         if (data) setTimer(data);
+      },
+      'minecraft-day-updated': (data) => {
+        if (data && typeof data.day === 'number') {
+          useOverlayStore.getState().setMinecraftDay(data.day);
+        }
       }
     };
 
@@ -298,7 +311,6 @@ export default function OverlayApp() {
       Object.entries(registeredHandlers).forEach(([ch, handler]) => {
         if (handler) window.api.off(ch, handler);
       });
-      clearTimeout(_saveLayoutTimeout);
     };
   }, [apiReady]);
 
@@ -323,8 +335,8 @@ export default function OverlayApp() {
         const wasEditMode = document.body.classList.contains('edit-mode');
         document.body.classList.toggle('edit-mode', !!config.moveMode);
         setIsMoving(!!config.moveMode);
-        if (!wasEditMode && config.moveMode && window.isolateWidgetsAbs) {
-          window.isolateWidgetsAbs();
+        if (!wasEditMode && config.moveMode) {
+          isolateWidgetsAbs();
         }
       }
       
@@ -356,7 +368,7 @@ export default function OverlayApp() {
           const gbB = document.getElementById('game-bg-bottom'); if (gbB) gbB.style.height = lb;
           const gbM = document.getElementById('game-bg-middle'); if (gbM) gbM.style.bottom = lb;
         }
-        if (window.syncCorners) window.syncCorners();
+        syncCorners();
       }
     }
   }, [config, activeTheme]);
@@ -431,7 +443,7 @@ export default function OverlayApp() {
   const frameThickness = config?.frameThickness || 0;
 
   return (
-    <>
+    <LayoutContext.Provider value={{ saveLayout, isolateWidgetsAbs, syncCorners }}>
       <div id="comp-frame" className={`drag-item lockable-widget locked-widget ${!isWidgetActive('frame') ? 'hidden' : ''}`} data-title="Marco del Stream" style={{ pointerEvents: isMoving ? 'auto' : 'none' }}>
         <div className="widget-content frame-content" style={{ borderWidth: `${frameThickness}px`, borderColor: 'var(--accent)' }}></div>
       </div>
@@ -463,8 +475,6 @@ export default function OverlayApp() {
           })}
         </div>
       </DraggableWidget>
-
-
 
       {config?.game?.filter(c => c.visible !== false).map((c, i) => (
         <DraggableWidget key={c.id} id={`comp-chip-${c.id}`} title={c.label} isGlass={config?.glassWidgets?.chips !== false} className="dynamic-chip" defaultPos={getWidgetDefaultPos(`comp-chip-${c.id}`)} style={{ display: isWidgetActive('chips') ? 'flex' : 'none', top: `${250 + i * 45}px`, left: '20px' }}>
@@ -513,6 +523,10 @@ export default function OverlayApp() {
         </div>
       </DraggableWidget>
 
+      <DraggableWidget id="comp-minecraft" title="Días Minecraft" isGlass={config?.glassWidgets?.minecraft !== false} defaultPos={getWidgetDefaultPos('comp-minecraft')}>
+        <MinecraftWidget />
+      </DraggableWidget>
+
       <DraggableWidget id="comp-game" title="Juego Actual" isGlass={config?.glassWidgets?.game !== false} defaultPos={getWidgetDefaultPos('comp-game')} className="text-right">
         <div className="val" id="game-name">{config?.gameName?.toUpperCase() || 'MINECRAFT'}</div>
       </DraggableWidget>
@@ -553,6 +567,7 @@ export default function OverlayApp() {
       </DraggableWidget>
 
       <ChatAvatars />
+      <VideoReactionWidget />
 
       <AlertManager />
       <AudioManager />
@@ -563,6 +578,6 @@ export default function OverlayApp() {
         isMoving={isMoving}
         setConfig={setConfig}
       />
-    </>
+    </LayoutContext.Provider>
   );
 }

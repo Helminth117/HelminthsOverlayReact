@@ -1,98 +1,85 @@
-const { spawn } = require('child_process');
+const { exec } = require('child_process');
 
 class MediaDetector {
-  constructor(broadcast) {
+  constructor(broadcast, getConfig) {
     this.broadcast = broadcast;
+    this.getConfig = getConfig;
     this.lastMedia = null;
     this.interval = null;
-    this.ps = null;
-    this.buffer = '';
   }
 
   start() {
     if (this.interval) clearInterval(this.interval);
-    
-    if (!this.ps && process.platform === 'win32') {
-      this.ps = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', '-']);
-      
-      this.ps.stdout.on('data', (data) => {
-        this.buffer += data.toString('utf8');
-        let idx = this.buffer.indexOf('---END---');
-        while (idx !== -1) {
-          const chunk = this.buffer.slice(0, idx);
-          const jsonStr = chunk.replace('---START---', '').trim();
-          this.processOutput(jsonStr);
-          const remainder = this.buffer.slice(idx + '---END---'.length);
-          this.buffer = remainder;
-          idx = this.buffer.indexOf('---END---');
-        }
-        if (this.buffer.length > 1_000_000) {
-          console.warn('[MediaDetect] Output buffer too large, resetting to avoid memory growth');
-          this.buffer = '';
-        }
-      });
-      
-      this.ps.stderr.on('data', (err) => console.error('[MediaDetect PS Error]', err.toString()));
-      this.ps.on('close', () => { this.ps = null; });
-    }
-
-    this.interval = setInterval(() => this.detectMedia(), 3000); // 3 seconds interval
+    this.interval = setInterval(() => this.detectMedia(), 10000); // Poll every 10 seconds (reduced from 3s)
+    this.detectMedia();
   }
 
   stop() {
-    if (this.interval) clearInterval(this.interval);
-    this.interval = null;
-    if (this.ps) {
-      this.ps.stdin.end();
-      this.ps.kill();
-      this.ps = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
     }
   }
 
   detectMedia() {
+    if (this.getConfig) {
+      const cfg = this.getConfig();
+      if (!cfg || cfg.autoDetectMedia === false) {
+        if (this.lastMedia !== null) {
+          this.lastMedia = null;
+          this.broadcast('media-updated', null);
+        }
+        return;
+      }
+    }
+
     if (process.platform === 'win32') {
-      if (!this.ps) {
-        console.log('[MediaDetect] PowerShell process crashed or not running. Restarting...');
-        this.start();
-      }
-      if (this.ps && this.ps.stdin.writable) {
-        const script = `
-$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding
-$procs = @(Get-Process Spotify, chrome, msedge, firefox, opera, brave, zen -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle }) | Select-Object Name, MainWindowTitle | ConvertTo-Json -Compress
-Write-Host "---START---"
-Write-Host $procs
-Write-Host "---END---"
-`;
-        this.ps.stdin.write(script + '\n');
-      }
+      // Query process window titles using a targeted PowerShell command
+      // It only inspects Spotify and browsers (extremely lightweight, avoids 200+ tasklist scans, no CP65001 crashes)
+      const cmd = 'powershell -NoProfile -NonInteractive -Command "Get-Process -Name Spotify, chrome, msedge, firefox, brave, zen -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle } | Select-Object Name, MainWindowTitle | ConvertTo-Json -Compress"';
+      exec(cmd, { timeout: 6000 }, (err, stdout) => {
+        if (stdout && stdout.trim()) {
+          this.processOutput(stdout);
+        } else {
+          // If stdout is empty, it means no targeted processes are running, clear media
+          this.processOutput('[]');
+        }
+      });
     }
   }
 
   processOutput(stdout) {
-    if (!stdout || stdout === 'null') return;
+    if (!stdout) return;
     try {
-      let procs = JSON.parse(stdout.trim());
-      if (!Array.isArray(procs)) procs = [procs];
+      let procs = [];
+      const trimmed = stdout.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        procs = JSON.parse(trimmed);
+        if (!Array.isArray(procs)) procs = [procs];
+      }
+
       let media = null;
-      if (Array.isArray(procs)) {
-        for (const p of procs) {
-          if (!p || !p.Name || !p.MainWindowTitle) continue;
-          const name = p.Name.toLowerCase();
-          const title = p.MainWindowTitle;
-          if (name === 'spotify' && title !== 'Spotify' && title !== 'Spotify Premium' && title !== 'Spotify Free') {
-            const parts = title.split(' - ');
-            if (parts.length >= 2) {
-              media = { artist: parts[0], title: parts.slice(1).join(' - '), source: 'spotify' };
-            } else {
-              media = { artist: 'Spotify', title: title, source: 'spotify' };
-            }
-            break;
+      for (const p of procs) {
+        if (!p || !p.Name || !p.MainWindowTitle) continue;
+        const name = p.Name.toLowerCase();
+        const title = p.MainWindowTitle;
+        
+        // Match Spotify
+        if (name === 'spotify' && title !== 'Spotify' && title !== 'Spotify Premium' && title !== 'Spotify Free') {
+          const parts = title.split(' - ');
+          if (parts.length >= 2) {
+            media = { artist: parts[0], title: parts.slice(1).join(' - '), source: 'spotify' };
+          } else {
+            media = { artist: 'Spotify', title: title, source: 'spotify' };
           }
-          if ((name === 'chrome' || name === 'msedge' || name === 'firefox' || name === 'opera' || name === 'brave' || name === 'zen') && title.includes('- YouTube')) {
-            const clean = title.replace(/ - YouTube.*/, '').replace(/^\(\d+\)\s+/, '');
-            media = { artist: 'YouTube', title: clean, source: 'youtube' };
-            break;
-          }
+          break;
+        }
+        
+        // Match browser processes with YouTube
+        if ((name === 'chrome' || name === 'msedge' || name === 'firefox' || name === 'brave' || name === 'zen') && title.includes('- YouTube')) {
+          const clean = title.replace(/ - YouTube.*/, '').replace(/^\(\d+\)\s+/, '');
+          media = { artist: 'YouTube', title: clean, source: 'youtube' };
+          break;
         }
       }
       
@@ -107,21 +94,21 @@ Write-Host "---END---"
             .then(r => r.json())
             .then(data => {
               if (data.results && data.results.length > 0) {
-                  const res = data.results[0];
-                  if (res.artworkUrl100) {
-                    media.albumArt = res.artworkUrl100.replace('100x100bb', '600x600bb');
-                  }
-                  if (res.trackTimeMillis) {
-                    media.duration = res.trackTimeMillis;
-                  }
+                const res = data.results[0];
+                if (res.artworkUrl100) {
+                  media.albumArt = res.artworkUrl100.replace('100x100bb', '600x600bb');
+                }
+                if (res.trackTimeMillis) {
+                  media.duration = res.trackTimeMillis;
+                }
               } else if (media.source === 'youtube') {
-                  media.albumArt = 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg';
+                media.albumArt = 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg';
               }
               this.broadcast('media-updated', media);
             })
             .catch(() => {
               if (media.source === 'youtube') {
-                  media.albumArt = 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg';
+                media.albumArt = 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg';
               }
               this.broadcast('media-updated', media);
             });
@@ -129,7 +116,9 @@ Write-Host "---END---"
           this.broadcast('media-updated', null);
         }
       }
-    } catch(e) { console.error('[MediaDetect] Parse error:', e.message); }
+    } catch (e) {
+      console.error('[MediaDetect] Parse error:', e.message);
+    }
   }
 }
 

@@ -21,6 +21,7 @@ const FILES = {
   plantillas:   path.join(DATA_DIR, 'plantillas.json'),
   config:       path.join(DATA_DIR, 'overlay_config.json'),
   gameProfiles: path.join(DATA_DIR, 'game_profiles.json'),
+  economy:      path.join(DATA_DIR, 'economy.json'),
 };
 
 const DEFAULT_SESSION = {
@@ -55,6 +56,7 @@ const DEFAULT_CONFIG = {
     { process: 'StardewValley', name: 'Stardew Valley', accent: '#7ec850', imageUrl: '', enabled: true },
   ],
   autoDetectGame: true,
+  autoDetectMedia: true,
   widgets: { user: true, socials: true, stats: true, objs: true, timers: true, game: true, chips: true },
   layout: {},
   alertTop: 40,

@@ -6,6 +6,8 @@ const store = require('./store');
 const { broadcast, getOverlayWin } = require('./windows');
 const { scanSteamGames } = require('./game-scanner');
 const filter = require('./filter');
+const economyService = require('./economy-service');
+const videoReactionService = require('./video-reaction-service');
 
 function getBlacklist() {
   let baseList = [];
@@ -112,9 +114,56 @@ function createSharedActions(tiktokService, gameDetector) {
   };
 }
 
-function registerIpcHandlers(tiktokService, twitchService, gameDetector) {
+function registerIpcHandlers(tiktokService, twitchService, gameDetector, createTikTokAuthWindow) {
   const { readJSON, writeJSON, getConfig, updateConfig } = store;
   const actions = createSharedActions(tiktokService, gameDetector);
+
+  ipcMain.handle('open-tiktok-auth', () => createTikTokAuthWindow());
+  ipcMain.handle('get-tiktok-auth', () => getConfig().tiktokAuth || null);
+  ipcMain.handle('clear-tiktok-auth', () => {
+    const config = getConfig();
+    delete config.tiktokAuth;
+    updateConfig(config);
+    tiktokService.setAuth(null, null);
+    return true;
+  });
+
+  ipcMain.handle('test-bot-command', async (_e, { user, text }) => {
+    const username = (user || 'Tester').trim();
+    if (!username) return false;
+    economyService.addPoints(username, 100000);
+    const dbUser = economyService.getUser(username);
+    broadcast('economy-update', { username, ...dbUser });
+    await tiktokService.processBotCommand(username, text);
+    return true;
+  });
+
+  ipcMain.handle('get-user-economy', (_e, username) => economyService.getUser(username));
+  ipcMain.handle('get-leaderboard', (_e, limit) => economyService.getLeaderboard(limit));
+  ipcMain.handle('admin-set-points', (_e, username, points) => {
+    const user = economyService.getUser(username);
+    if (user) {
+      user.points = points;
+      economyService.save();
+      broadcast('economy-update', { username, ...user });
+      return user;
+    }
+    return null;
+  });
+  ipcMain.handle('admin-give-points', (_e, username, amount) => {
+    economyService.addPoints(username, amount);
+    const user = economyService.getUser(username);
+    if (user) {
+      broadcast('economy-update', { username, ...user });
+      return user;
+    }
+    return null;
+  });
+
+  ipcMain.handle('get-video-queue', () => videoReactionService.getQueue());
+  ipcMain.handle('mark-video-played', (_e, id) => videoReactionService.markPlayed(id));
+  ipcMain.handle('remove-video-queue', (_e, id) => videoReactionService.removeFromQueue(id));
+  ipcMain.handle('update-video-reaction-settings', (_e, settings) => videoReactionService.updateSettings(settings));
 
   ipcMain.handle('get-remote-info', () => qrData);
 
@@ -210,6 +259,14 @@ function registerIpcHandlers(tiktokService, twitchService, gameDetector) {
   });
 
   ipcMain.on('timer-tick', (_e, data) => broadcast('timer-tick', data));
+
+  ipcMain.on('video-reaction-play', (_e, data) => broadcast('video-reaction-play', data));
+  ipcMain.on('video-reaction-pause', () => broadcast('video-reaction-pause'));
+  ipcMain.on('video-reaction-resume', () => broadcast('video-reaction-resume'));
+  ipcMain.on('video-reaction-stop', () => broadcast('video-reaction-stop'));
+  ipcMain.on('video-reaction-seek', (_e, seconds) => broadcast('video-reaction-seek', seconds));
+  ipcMain.on('video-reaction-volume', (_e, level) => broadcast('video-reaction-volume', level));
+  ipcMain.on('video-reaction-time', (_e, data) => broadcast('video-reaction-time', data));
 
   ipcMain.on('local-song-started', (_e, data) => broadcast('local-song-started', data));
   ipcMain.on('local-media-time', (_e, data) => broadcast('local-media-time', data));

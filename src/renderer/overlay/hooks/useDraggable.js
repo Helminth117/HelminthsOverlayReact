@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useOverlayStore } from '../../store';
+import { LayoutContext } from '../LayoutContext';
 
 export function useDraggable(id, elRef, defaultPos) {
+  const layoutCtx = useContext(LayoutContext) || {};
+  const { saveLayout, isolateWidgetsAbs } = layoutCtx;
+
   const isMoving = useOverlayStore(state => state.isMoving);
   const config = useOverlayStore(state => state.config) || {};
 
@@ -23,7 +27,36 @@ export function useDraggable(id, elRef, defaultPos) {
     }
   }, [layout, id]);
 
-  const pos = localPos || defaultPos;
+  const rawPos = localPos || defaultPos;
+  const pos = { ...rawPos };
+
+  if (id === 'comp-chat-avatars') {
+    const topMargin = window.innerHeight * 0.2323;
+    const bottomMargin = window.innerHeight * (1 - 0.2323);
+    const widgetHeight = parseFloat(pos.h) || 110;
+    const maxTop = topMargin - widgetHeight;
+    const minBottom = bottomMargin;
+
+    if (pos.t !== undefined) {
+      let tVal = parseFloat(pos.t);
+      if (tVal > maxTop && tVal < minBottom) {
+        const middle = (maxTop + minBottom) / 2;
+        tVal = tVal < middle ? maxTop : minBottom;
+      }
+      tVal = Math.max(0, Math.min(window.innerHeight - widgetHeight, tVal));
+      pos.t = `${tVal}px`;
+      delete pos.b;
+    } else if (pos.b !== undefined) {
+      let bVal = parseFloat(pos.b);
+      let tVal = window.innerHeight - widgetHeight - bVal;
+      if (tVal > maxTop && tVal < minBottom) {
+        const middle = (maxTop + minBottom) / 2;
+        tVal = tVal < middle ? maxTop : minBottom;
+        pos.t = `${tVal}px`;
+        delete pos.b;
+      }
+    }
+  }
   let widgetKey = id.replace('comp-', '');
   if (widgetKey.startsWith('chip-')) {
     widgetKey = 'chips';
@@ -51,7 +84,7 @@ export function useDraggable(id, elRef, defaultPos) {
       e.preventDefault();
       e.stopPropagation();
 
-      if (window.isolateWidgetsAbs) window.isolateWidgetsAbs();
+      if (isolateWidgetsAbs) isolateWidgetsAbs();
 
       window.highestZ = window.highestZ || 100;
       window.highestZ++;
@@ -107,6 +140,20 @@ export function useDraggable(id, elRef, defaultPos) {
         else { if (guideElY) guideElY.style.display = 'none'; }
       }
 
+      if (id === 'comp-chat-avatars') {
+        const topMargin = window.innerHeight * 0.2323;
+        const bottomMargin = window.innerHeight * (1 - 0.2323);
+        const widgetHeight = rect.height || 110;
+        const maxTop = topMargin - widgetHeight;
+        const minBottom = bottomMargin;
+
+        if (nT > maxTop && nT < minBottom) {
+          const middle = (maxTop + minBottom) / 2;
+          nT = nT < middle ? maxTop : minBottom;
+        }
+        nT = Math.max(0, Math.min(window.innerHeight - widgetHeight, nT));
+      }
+
       el.style.top = `${nT}px`;
       el.style.left = `${nL}px`;
       el.style.bottom = 'auto';
@@ -135,8 +182,8 @@ export function useDraggable(id, elRef, defaultPos) {
 
       setLocalPos(prev => ({ ...prev, ...newPos }));
       
-      if (window.saveLayout) {
-        window.saveLayout();
+      if (saveLayout) {
+        saveLayout();
       } else {
         window.api.getConfig().then(cfg => {
           if (!cfg) return;
@@ -155,7 +202,7 @@ export function useDraggable(id, elRef, defaultPos) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isMoving, id]);
+  }, [isMoving, id, saveLayout, isolateWidgetsAbs]);
 
   // Resizing event handlers
   const handleResizerPointerDown = (e) => {
@@ -164,7 +211,7 @@ export function useDraggable(id, elRef, defaultPos) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (window.isolateWidgetsAbs) window.isolateWidgetsAbs();
+    if (isolateWidgetsAbs) isolateWidgetsAbs();
 
     const el = elRef.current;
     if (!el) return;
@@ -215,8 +262,8 @@ export function useDraggable(id, elRef, defaultPos) {
       };
       setLocalPos(prev => ({ ...prev, ...newPos }));
 
-      if (window.saveLayout) {
-        window.saveLayout();
+      if (saveLayout) {
+        saveLayout();
       } else {
         window.api.getConfig().then(cfg => {
           if (!cfg) return;

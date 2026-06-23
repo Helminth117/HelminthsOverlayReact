@@ -1,13 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import TimerCard from './TimerCard';
 
-function formatTime(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
-}
-
-export default function LiveDashboard({
+const LiveDashboard = React.memo(function LiveDashboard({
   activeTab,
   config,
   saveConfig,
@@ -20,21 +14,18 @@ export default function LiveDashboard({
   setIsPollActive,
   chatHistory,
   queueData,
-  timerSeconds,
-  timerMode,
-  timerRunning,
-  timerDoneMsg,
-  countdownInput,
-  setCountdownInput,
-  timerToggle,
-  timerSwitchMode,
-  timerReset,
-  applyCountdown
+  initialSession,
+  setSession
 }) {
-  if (activeTab !== 'live') return null;
+  const reversedChat = useMemo(() => {
+    return [...chatHistory].reverse();
+  }, [chatHistory]);
 
   return (
-    <div className="tab-view active" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+    <div 
+      className={`tab-view ${activeTab === 'live' ? 'active' : ''}`} 
+      style={{ display: activeTab === 'live' ? 'flex' : 'none', flexDirection: 'column', gap: 'var(--space-md)' }}
+    >
       {/* ── CONEXIÓN ── */}
       <div className="card">
         <h2>🔴 Conectar a TikTok Live</h2>
@@ -78,6 +69,93 @@ export default function LiveDashboard({
           <div className={`status-dot ${ttStatus.state === 'connected' ? 'live' : (ttStatus.state === 'waiting' ? 'online' : (ttStatus.state === 'error' ? 'error' : ''))}`} />
           <span className="text-sm text-secondary">{ttStatus.msg}</span>
         </div>
+      </div>
+
+      {/* ── CUENTA BOT TIKTOK ── */}
+      <div className="card">
+        <h2>🤖 Cuenta Bot TikTok</h2>
+        {config?.tiktokAuth ? (
+          <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="flex items-center gap-sm" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="badge" style={{ background: '#10b981', color: '#fff', padding: '4px 8px', borderRadius: 'var(--radius-sm, 4px)', fontSize: '12px', fontWeight: 'bold' }}>
+                Bot autenticado
+              </span>
+              <button 
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}
+                onClick={async () => {
+                  if (confirm('¿Desconectar cuenta del bot?')) {
+                    await window.api.clearTikTokAuth();
+                  }
+                }}
+              >
+                Desconectar
+              </button>
+            </div>
+            <p className="text-xs text-secondary" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              El bot está listo para enviar respuestas automáticas y procesar comandos.
+            </p>
+          </div>
+        ) : (
+          <div className="flex-col gap-sm" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button 
+              className="btn btn-primary w-full"
+              style={{ justifyContent: 'center' }}
+              onClick={() => window.api.openTikTokAuth()}
+            >
+              Conectar cuenta TikTok
+            </button>
+            <p className="text-xs text-secondary" style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              Recomendado: usa una cuenta secundaria dedicada al bot
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── COPIAR URL OBS EN MÓVIL ── */}
+      <div className="card mobile-only" style={{ display: 'none' }}>
+        <h2 style={{ fontSize: 13, marginBottom: 8 }}>🔗 Enlace del Overlay (OBS / TikTok)</h2>
+        <button 
+          className="btn btn-primary w-full" 
+          style={{ justifyContent: 'center' }} 
+          onClick={async () => {
+            try {
+              const info = await window.api.getRemoteInfo();
+              if (info) {
+                let overlayUrl = '';
+                const activeUrl = info.tunnelUrl;
+                if (activeUrl) {
+                  overlayUrl = `${activeUrl}/overlay.html?token=${info.token || ''}`;
+                } else if (info.url) {
+                  const urlObj = new URL(info.url);
+                  const hostname = urlObj.hostname;
+                  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                    urlObj.hostname = '127.0.0.1.nip.io';
+                  } else if (/^[0-9.]+$/.test(hostname)) {
+                    urlObj.hostname = `${hostname}.nip.io`;
+                  }
+                  overlayUrl = urlObj.toString().replace('/control.html', '/overlay.html');
+                }
+                
+                if (overlayUrl) {
+                  if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(overlayUrl);
+                  } else if (window.api && typeof window.api.writeClipboard === 'function') {
+                    window.api.writeClipboard(overlayUrl);
+                  }
+                  alert("¡Enlace del overlay copiado! Agrégalo en OBS/TikTok Studio.");
+                } else {
+                  alert("No se pudo obtener el enlace.");
+                }
+              }
+            } catch (e) {
+              console.error(e);
+              alert("Error al copiar enlace.");
+            }
+          }}
+        >
+          🔗 Copiar URL OBS/TikTok
+        </button>
       </div>
 
       {ttStatus.stats && (
@@ -128,46 +206,12 @@ export default function LiveDashboard({
       </div>
 
       {/* ── TEMPORIZADOR DEL STREAM ── */}
-      <div className="card">
-        <h2>⏱ Temporizador del Stream</h2>
-        <div className="timer-display">{formatTime(timerSeconds)}</div>
-        {timerDoneMsg && (
-          <div style={{ textAlign: 'center', color: 'var(--danger)', fontWeight: 'bold', marginBottom: 'var(--space-sm)', fontSize: 13 }}>
-            ¡TIEMPO TERMINADO!
-          </div>
-        )}
-
-        <div className="flex gap-sm mt-md">
-          <button className="btn btn-ghost flex-1" onClick={timerSwitchMode}>Modo: {timerMode === 'chrono' ? 'Crono' : 'Regresiva'}</button>
-          <button className={`btn flex-1 ${timerRunning ? 'btn-danger' : 'btn-success'}`} onClick={timerToggle}>{timerRunning ? 'Pausar' : 'Iniciar'}</button>
-          <button className="btn btn-danger" style={{ padding: 10 }} onClick={timerReset}>Reset</button>
-        </div>
-
-        {timerMode === 'countdown' && (
-          <div className="flex gap-sm mt-sm">
-            <input className="inp" type="number" placeholder="min" min="0" value={countdownInput.mins} onChange={e => setCountdownInput({ ...countdownInput, mins: e.target.value })} />
-            <input className="inp" type="number" placeholder="seg" min="0" max="59" value={countdownInput.secs} onChange={e => setCountdownInput({ ...countdownInput, secs: e.target.value })} />
-            <button className="btn btn-primary" onClick={applyCountdown}>Fijar Tiempo</button>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mt-md pt-sm" style={{ borderTop: '1px solid var(--border-light)' }}>
-          <span className="text-sm font-bold">Modo Extensible (Subathon)</span>
-          <button className={`toggle ${config.subathonMode ? 'on' : ''}`} onClick={() => saveConfig({ subathonMode: !config.subathonMode })}></button>
-        </div>
-        {config.subathonMode && (
-          <div className="flex gap-sm mt-xs" style={{ background: 'var(--bg-input)', padding: 10, borderRadius: 8 }}>
-            <div style={{ flex: 1 }}>
-              <div className="text-xs text-secondary mb-xs">+ Seg por Follow</div>
-              <input type="number" className="inp" value={config.subathonFollow ?? 10} min="0" style={{ width: '100%' }} onChange={(e) => saveConfig({ subathonFollow: parseInt(e.target.value) || 0 })} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="text-xs text-secondary mb-xs">+ Seg por Regalo</div>
-              <input type="number" className="inp" value={config.subathonGift ?? 30} min="0" style={{ width: '100%' }} onChange={(e) => saveConfig({ subathonGift: parseInt(e.target.value) || 0 })} />
-            </div>
-          </div>
-        )}
-      </div>
+      <TimerCard
+        initialSession={initialSession}
+        setSession={setSession}
+        config={config}
+        saveConfig={saveConfig}
+      />
 
       {/* ── ENCUESTAS DE CHAT ── */}
       <div className="card">
@@ -320,7 +364,7 @@ export default function LiveDashboard({
         <div className="card" id="tiktok-chat-card">
           <h2 className="mb-sm">Chat del Stream</h2>
           <div id="tt-chat-list" className="flex-col" style={{ maxHeight: 350, overflowY: 'auto' }}>
-            {[...chatHistory].reverse().map((msg, idx) => (
+            {reversedChat.map((msg, idx) => (
               <div key={idx} className="flex items-center justify-between p-xs" style={{ borderBottom: '1px solid var(--border-light)' }}>
                 <div style={{ flex: 1, fontSize: 13, lineHeight: 1.4 }}>
                   {msg.isMod && <span style={{ background: 'var(--accent)', color: '#fff', fontSize: 10, padding: '2px 4px', borderRadius: 4, marginRight: 4 }}>MOD</span>}
@@ -336,4 +380,6 @@ export default function LiveDashboard({
       )}
     </div>
   );
-}
+});
+
+export default LiveDashboard;

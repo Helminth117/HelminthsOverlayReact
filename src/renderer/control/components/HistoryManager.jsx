@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function HistoryManager({
+const HistoryManager = React.memo(function HistoryManager({
   activeTab,
   historial,
   setHistorial,
@@ -8,8 +8,6 @@ export default function HistoryManager({
   setActiveTab,
   showSaved
 }) {
-  if (activeTab !== 'historial') return null;
-
   return (
     <main className={`tab-view ${activeTab === 'historial' ? 'active' : ''}`}>
       <div className="flex items-center justify-between mb-md">
@@ -78,4 +76,6 @@ export default function HistoryManager({
       </div>
     </main>
   );
-}
+});
+
+export default HistoryManager;

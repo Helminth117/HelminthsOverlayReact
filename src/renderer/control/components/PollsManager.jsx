@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function PollsManager({
+const PollsManager = React.memo(function PollsManager({
   activeTab,
   poll,
   setPoll,
@@ -126,7 +126,7 @@ export default function PollsManager({
     };
   }, []);
 
-  if (activeTab !== 'encuestas') return null;
+
 
   // Add a new option input to the template
   const addOption = () => {
@@ -215,7 +215,7 @@ export default function PollsManager({
   };
 
   return (
-    <main className="tab-view active flex-col gap-md" style={{ animation: 'slideUpFade 0.4s var(--ease-out)' }}>
+    <main className={`tab-view ${activeTab === 'encuestas' ? 'active' : ''} flex-col gap-md`} style={{ animation: 'slideUpFade 0.4s var(--ease-out)' }}>
       <div className="flex justify-between items-center">
         <div>
           <h1 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -442,4 +442,6 @@ export default function PollsManager({
       </div>
     </main>
   );
-}
+});
+
+export default PollsManager;

@@ -2435,7 +2435,7 @@ input:disabled + .slider {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .scene-hidden {
   opacity: 0;
@@ -2464,6 +2464,17 @@ input:disabled + .slider {
   -webkit-backdrop-filter: blur(25px);
 }
 
+/* Fondo por escena - gradientes */
+.scene-starting .scene-glass-bg {
+  background: linear-gradient(135deg, rgba(10,10,30,0.85) 0%, rgba(var(--accent-rgb, 139, 92, 246),0.15) 100%);
+}
+.scene-brb .scene-glass-bg {
+  background: linear-gradient(135deg, rgba(20,10,40,0.88) 0%, rgba(80,20,120,0.25) 100%);
+}
+.scene-ending .scene-glass-bg {
+  background: linear-gradient(135deg, rgba(5,15,10,0.88) 0%, rgba(var(--accent-rgb, 139, 92, 246),0.2) 100%);
+}
+
 .scene-particles {
   position: absolute;
   top: 0; left: 0;
@@ -2481,7 +2492,7 @@ input:disabled + .slider {
   background: rgba(255, 255, 255, 0.8);
   border-radius: 50%;
   box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
-  animation: floatParticle 10s linear infinite;
+  animation: floatParticle var(--dur, 10s) linear var(--delay, 0s) infinite;
   pointer-events: none;
 }
 @keyframes floatParticle {
@@ -2489,6 +2500,31 @@ input:disabled + .slider {
   20% { opacity: 1; }
   80% { opacity: 1; }
   100% { transform: translateY(-10vh) scale(1.5); opacity: 0; }
+}
+
+/* Animaciones específicas de partículas por escena */
+.scene-starting .scene-particle {
+  animation: floatParticle var(--dur, 6s) linear var(--delay, 0s) infinite;
+}
+.scene-brb .scene-particle {
+  animation: brbFloat var(--dur, 12s) ease-in-out var(--delay, 0s) infinite;
+}
+.scene-ending .scene-particle {
+  animation: confettiFall var(--dur, 4s) linear var(--delay, 0s) infinite;
+}
+
+@keyframes brbFloat {
+  0% { transform: translateY(100vh) translateX(0) scale(1); opacity: 0; }
+  10% { opacity: 0.8; }
+  30% { transform: translateY(70vh) translateX(20px) scale(1); }
+  60% { transform: translateY(40vh) translateX(-20px) scale(1.1); }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(-10vh) translateX(10px) scale(1); opacity: 0; }
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
 }
 
 .scene-content {
@@ -2520,21 +2556,78 @@ input:disabled + .slider {
 #scene-title {
   font-size: 3.5rem;
   font-weight: 900;
-  margin: 0;
+  margin: 0 auto;
   letter-spacing: 4px;
   text-transform: uppercase;
   font-family: 'Outfit', sans-serif;
   line-height: 1.1;
   padding: 0 20px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  max-width: 550px !important;
+  text-align: center;
+}
+
+/* Animación de entrada de letras (SplitText) */
+#scene-title span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(40px) rotateX(90deg);
+  animation: letterReveal 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  background: linear-gradient(135deg, #ffffff, var(--accent, #00f3ff));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes letterReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
 }
 
 #scene-subtitle {
   font-size: 1.5rem;
   color: #eeeeee;
   font-weight: 600;
-  margin: 0;
+  margin: 0 auto;
   letter-spacing: 2px;
   text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+  max-width: 450px !important;
+  text-align: center;
+}
+
+/* Animaciones específicas de subtítulos */
+.scene-typewriter {
+  display: inline-block;
+  margin: 0 auto;
+  width: fit-content;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--accent);
+  width: 0;
+  animation: typewriter 1.5s steps(30) 0.8s forwards,
+             cursorBlink 0.8s step-end 0.8s 3;
+}
+@keyframes typewriter {
+  to { width: 100%; }
+}
+@keyframes cursorBlink {
+  50% { border-color: transparent; }
+}
+
+.scene-brb #scene-subtitle {
+  animation: subtitlePulse 2.5s ease-in-out infinite;
+}
+@keyframes subtitlePulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}
+
+.scene-ending #scene-subtitle span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: letterReveal 0.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 #scene-countdown {
@@ -2589,6 +2682,32 @@ input:disabled + .slider {
 .scene-stat-val {
   font-size: 2.5rem;
   font-weight: 900;
+}
+
+/* Animación de salida (fase leaving) */
+#scene-container.scene-phase-leaving {
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+.scene-phase-leaving .scene-content {
+  animation: sceneLeave 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+@keyframes sceneLeave {
+  to {
+    opacity: 0;
+    transform: translateY(-40px) scale(0.9) rotateX(-10deg);
+    filter: blur(12px);
+  }
+}
+.scene-phase-leaving .scene-glass-bg {
+  transition: all 0.7s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  background: rgba(10,10,20,0) !important;
+  backdrop-filter: blur(0px) !important;
+  -webkit-backdrop-filter: blur(0px) !important;
+}
+.scene-phase-leaving .scene-particles {
+  transition: opacity 0.6s ease-in !important;
+  opacity: 0 !important;
 }
 
 /* ── Chat Avatars System ── */
@@ -3180,5 +3299,35 @@ body.theme-luna-cosmic ::-webkit-scrollbar-thumb {
 body.theme-luna-cosmic ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 215, 0, 0.4) !important;
 }
+
+/* ── FASE 6: Video Reaction Widget Styles ── */
+#comp-video-reaction {
+  z-index: 99;
+}
+
+.comp-video-reaction-wrapper {
+  box-sizing: border-box;
+}
+
+.comp-video-reaction-wrapper .crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 2;
+  opacity: 0.85;
+}
+
+.comp-video-reaction-wrapper .reaction-info-bar {
+  box-sizing: border-box;
+}
+
 
 

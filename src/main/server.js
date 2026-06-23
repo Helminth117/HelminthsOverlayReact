@@ -199,8 +199,13 @@ async function startServer(config, onConfigUpdate, rpcHandler) {
       const allowedOrigins = [
         `http://localhost:${currentPort}`,
         `http://127.0.0.1:${currentPort}`,
-        `http://${getLocalIp()}:${currentPort}`
+        `http://${getLocalIp()}:${currentPort}`,
+        'http://localhost:5173',
+        'http://127.0.0.1:5173'
       ];
+      if (process.env.VITE_DEV_SERVER_URL) {
+        allowedOrigins.push(process.env.VITE_DEV_SERVER_URL.replace(/\/$/, ''));
+      }
       if (tunnelUrl) {
         allowedOrigins.push(tunnelUrl);
       }

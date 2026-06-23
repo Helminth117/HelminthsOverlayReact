@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useOverlayStore } from '../../store';
 
 export default function GoalsList() {
   const [sessionData, setSessionData] = useState(null);

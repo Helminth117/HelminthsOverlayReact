@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('api', {
   // ── TikTok ──
   tiktokConnect: (user)  => ipcRenderer.invoke('tiktok-connect', user),
   tiktokReset:   ()      => ipcRenderer.invoke('tiktok-reset'),
+  openTikTokAuth: () => ipcRenderer.invoke('open-tiktok-auth'),
+  getTikTokAuth: () => ipcRenderer.invoke('get-tiktok-auth'),
+  clearTikTokAuth: () => ipcRenderer.invoke('clear-tiktok-auth'),
+  onTikTokAuthSaved: (cb) => ipcRenderer.on('tiktok-auth-saved', cb),
 
   // ── Overlay move mode ──
   setMoveMode: (active) => ipcRenderer.send('set-move-mode', active),
@@ -40,7 +44,10 @@ contextBridge.exposeInMainWorld('api', {
       'item-completed', 'timer-tick', 'stream-alert', 'game-detected', 'tiktok-chat', 'media-updated', 'auto-toggle-social', 'play-soundboard', 'yt-ended', 'yt-time', 'highlight-chat',
       'yt-pause', 'yt-resume', 'yt-stop', 'yt-skip', 'yt-remove-song',
       'queue-updated', 'move-mode', 'pin-message', 'tunnel-status', 'twitch-status',
-      'local-song-started', 'local-media-time', 'local-lyrics-update'
+      'local-song-started', 'local-media-time', 'local-lyrics-update', 'minecraft-day-updated',
+      'tiktok-auth-saved', 'tiktok-auth-cancelled', 'economy-update',
+      'video-reaction-queued', 'video-reaction-ready', 'video-reaction-updated', 'video-reaction-removed', 'video-reaction-settings-updated',
+      'video-reaction-play', 'video-reaction-pause', 'video-reaction-resume', 'video-reaction-stop', 'video-reaction-seek', 'video-reaction-volume', 'video-reaction-time'
     ];
     if (allowed.includes(channel)) {
       const handler = (_e, ...args) => cb(...args);
@@ -99,6 +106,29 @@ contextBridge.exposeInMainWorld('api', {
   saveGameProfiles:   (profiles) => ipcRenderer.invoke('save-game-profiles', profiles),
   scanPcGames:        ()         => ipcRenderer.invoke('scan-pc-games'),
   toggleAutoDetect:   (val)      => ipcRenderer.invoke('toggle-auto-detect', val),
+
+  // ── Economy ──
+  getUserEconomy: (username) => ipcRenderer.invoke('get-user-economy', username),
+  getLeaderboard: (limit) => ipcRenderer.invoke('get-leaderboard', limit),
+  adminSetPoints: (username, points) => ipcRenderer.invoke('admin-set-points', username, points),
+  adminGivePoints: (username, amount) => ipcRenderer.invoke('admin-give-points', username, amount),
+
+  // ── Video Reactions ──
+  getVideoQueue: () => ipcRenderer.invoke('get-video-queue'),
+  markVideoPlayed: (id) => ipcRenderer.invoke('mark-video-played', id),
+  removeVideoQueue: (id) => ipcRenderer.invoke('remove-video-queue', id),
+  updateVideoReactionSettings: (settings) => ipcRenderer.invoke('update-video-reaction-settings', settings),
+  onVideoReactionQueued: (cb) => ipcRenderer.on('video-reaction-queued', cb),
+  onVideoReactionReady: (cb) => ipcRenderer.on('video-reaction-ready', cb),
+  playVideoReaction: (data) => ipcRenderer.send('video-reaction-play', data),
+  pauseVideoReaction: () => ipcRenderer.send('video-reaction-pause'),
+  resumeVideoReaction: () => ipcRenderer.send('video-reaction-resume'),
+  stopVideoReaction: () => ipcRenderer.send('video-reaction-stop'),
+  seekVideoReaction: (seconds) => ipcRenderer.send('video-reaction-seek', seconds),
+  volumeVideoReaction: (level) => ipcRenderer.send('video-reaction-volume', level),
+  sendVideoReactionTime: (data) => ipcRenderer.send('video-reaction-time', data),
+  testBotCommand: (user, text) => ipcRenderer.invoke('test-bot-command', { user, text }),
+
   forceGameDetect:    ()         => ipcRenderer.invoke('force-game-detect'),
   selectImage:        ()         => ipcRenderer.invoke('select-image'),
   writeClipboard:     (text)     => clipboard.writeText(text),

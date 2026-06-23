@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useOverlayStore } from '../../store';
 import '../styles/winisland.css';
 
 export default function WinIsland() {
@@ -9,8 +8,6 @@ export default function WinIsland() {
   const [localActive, setLocalActive] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragCurrent, setDragCurrent] = useState(0);
-
-  const config = useOverlayStore(s => s.config) || {};
 
   const localActiveRef = useRef(false);
   const mediaInfoRef = useRef(mediaInfo);

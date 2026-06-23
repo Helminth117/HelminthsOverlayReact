@@ -9,8 +9,7 @@ function formatTime(s) {
 }
 
 export default function TimerDisplay() {
-  const timerData = useOverlayStore(s => s.timer);
-  const seconds = timerData.seconds || 0;
+  const seconds = useOverlayStore(s => s.timer?.seconds || 0);
   const val = formatTime(seconds);
   const spansRef = useRef([]);
 

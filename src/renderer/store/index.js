@@ -7,6 +7,7 @@ export const useOverlayStore = create((set, get) => ({
   timer: { active: false, val: '00:00:00' },
   polls: [],
   scene: { type: 'none', stats: {} }, // 'none', 'starting', 'brb', 'ending'
+  minecraftDay: 0,
   
   setConfig: (config) => set({ config }),
   setIsMoving: (isMoving) => set({ isMoving }),
@@ -14,4 +15,5 @@ export const useOverlayStore = create((set, get) => ({
   setTimer: (timer) => set({ timer }),
   setPolls: (polls) => set({ polls }),
   setScene: (scene) => set({ scene }),
+  setMinecraftDay: (minecraftDay) => set({ minecraftDay }),
 }));

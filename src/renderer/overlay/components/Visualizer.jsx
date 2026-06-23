@@ -94,17 +94,26 @@ export default function Visualizer() {
     const dataArray = new Uint8Array(bufferLength);
     const smoothedArray = new Float32Array(bufferLength);
 
+    // Track size efficiently using ResizeObserver to eliminate layout thrashing
+    let currentW = 0;
+    let currentH = 0;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        currentW = Math.floor(width * 2);
+        currentH = Math.floor(height * 2);
+      }
+    });
+    resizeObserver.observe(canvas);
+
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
 
-      const rect = canvas.getBoundingClientRect();
-      const targetW = Math.floor(rect.width * 2);
-      const targetH = Math.floor(rect.height * 2);
-
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        if (targetW > 0 && targetH > 0) {
-          canvas.width = targetW;
-          canvas.height = targetH;
+      if (currentW > 0 && currentH > 0) {
+        if (canvas.width !== currentW || canvas.height !== currentH) {
+          canvas.width = currentW;
+          canvas.height = currentH;
         }
       }
 
@@ -169,6 +178,7 @@ export default function Visualizer() {
 
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      resizeObserver.disconnect();
     };
   }, [initialized]);
 

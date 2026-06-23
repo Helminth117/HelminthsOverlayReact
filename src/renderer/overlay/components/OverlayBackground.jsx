@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
+import { LayoutContext } from '../LayoutContext';
 
 export default function OverlayBackground({
   isMoving,
@@ -6,6 +7,8 @@ export default function OverlayBackground({
   bgImage,
   bgFading
 }) {
+  const { syncCorners } = useContext(LayoutContext) || {};
+
   // Cinematic Border Dragging
   useEffect(() => {
     if (!isMoving) return;
@@ -33,7 +36,7 @@ export default function OverlayBackground({
             if (gbB) gbB.style.height = v + 'px';
             if (gbM) gbM.style.bottom = v + 'px';
           }
-          if (window.syncCorners) window.syncCorners();
+          if (syncCorners) syncCorners();
         };
         const stop = () => {
           document.removeEventListener('mousemove', move);

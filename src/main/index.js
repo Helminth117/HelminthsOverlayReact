@@ -1,4 +1,4 @@
-const { app, ipcMain, session, desktopCapturer, protocol, net } = require('electron');
+const { app, ipcMain, session, desktopCapturer, protocol, net, BrowserWindow } = require('electron');
 const { exec } = require('child_process');
 const https = require('https');
 const path = require('path');
@@ -40,9 +40,16 @@ console.log('UserData Path:', app.getPath('userData'));
 
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
-if (!app.isPackaged) {
-  app.disableHardwareAcceleration();
-}
+// Enable hardware acceleration for WebGL2 rendering in development
+// if (!app.isPackaged) {
+//   app.disableHardwareAcceleration();
+// }
+
+// Force hardware acceleration and ignore GPU blacklist for WebGL2 stability
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('enable-webgl2-compute-context');
 
 const { FILES, DEFAULT_SESSION, DEFAULT_CONFIG } = require('./constants');
 const store = require('./store');
@@ -61,6 +68,22 @@ const { getConfig, updateConfig } = store;
 const windows = require('./windows');
 const { createOverlay, createControl, createTray, broadcast } = windows;
 
+// ── Single Instance Lock to prevent multiple concurrent background processes of the app ──
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log('[Main] Another instance of StreamOverlay is already running. Quitting this instance.');
+  app.quit();
+  process.exit(0);
+} else {
+  app.on('second-instance', () => {
+    const controlWindow = windows.getControlWin ? windows.getControlWin() : null;
+    if (controlWindow) {
+      if (controlWindow.isMinimized()) controlWindow.restore();
+      controlWindow.focus();
+    }
+  });
+}
+
 store.setConfigChangeCallback((newConfig) => {
   broadcast('config-updated', newConfig);
   remoteServer.broadcastConfig(newConfig);
@@ -71,15 +94,91 @@ const GameDetector = require('./game-detector');
 const gameDetector = new GameDetector(broadcast, getConfig, updateConfig);
 
 const MediaDetector = require('./media-detector');
-const mediaDetector = new MediaDetector(broadcast);
+const mediaDetector = new MediaDetector(broadcast, getConfig);
 
 const TikTokService = require('./tiktok-service');
 const tiktokService = new TikTokService(broadcast, getConfig);
+const initialCfg = getConfig();
+if (initialCfg && initialCfg.tiktokAuth) {
+  tiktokService.setAuth(initialCfg.tiktokAuth.sessionId, initialCfg.tiktokAuth.ttTargetIdc);
+}
 
 const TwitchService = require('./twitch-service');
 const twitchService = new TwitchService(broadcast);
 
-ipcHandlers.registerIpcHandlers(tiktokService, twitchService, gameDetector);
+const MinecraftService = require('./minecraft-service');
+const minecraftService = new MinecraftService(broadcast, getConfig, updateConfig);
+
+let tiktokAuthWin = null;
+function createTikTokAuthWindow() {
+  if (tiktokAuthWin) {
+    tiktokAuthWin.focus();
+    return;
+  }
+  
+  tiktokAuthWin = new BrowserWindow({
+    width: 480,
+    height: 720,
+    title: 'TikTok Login',
+    webPreferences: {
+      partition: 'persist:tiktok',
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  tiktokAuthWin.loadURL('https://www.tiktok.com/login');
+
+  const ses = tiktokAuthWin.webContents.session;
+  let authChecked = false;
+
+  const cookieInterval = setInterval(async () => {
+    if (!tiktokAuthWin || tiktokAuthWin.isDestroyed()) {
+      clearInterval(cookieInterval);
+      return;
+    }
+    try {
+      const cookies = await ses.cookies.get({ domain: 'tiktok.com' });
+      const sessionIdCookie = cookies.find(c => c.name === 'sessionid');
+      const ttTargetIdcCookie = cookies.find(c => c.name === 'tt-target-idc');
+
+      if (sessionIdCookie && ttTargetIdcCookie) {
+        clearInterval(cookieInterval);
+        authChecked = true;
+        
+        const sessionId = sessionIdCookie.value;
+        const ttTargetIdc = ttTargetIdcCookie.value;
+
+        // Guardamos en config.json bajo tiktokAuth
+        const config = store.getConfig();
+        config.tiktokAuth = { sessionId, ttTargetIdc };
+        store.updateConfig(config);
+
+        // Emit tiktok-auth-saved to renderer
+        broadcast('tiktok-auth-saved', { sessionId, ttTargetIdc });
+
+        // set auth in service
+        tiktokService.setAuth(sessionId, ttTargetIdc);
+
+        if (tiktokAuthWin && !tiktokAuthWin.isDestroyed()) {
+          tiktokAuthWin.close();
+        }
+      }
+    } catch (e) {
+      console.error('[TikTokAuth] Error checking cookies:', e);
+    }
+  }, 2000);
+
+  tiktokAuthWin.on('closed', () => {
+    tiktokAuthWin = null;
+    clearInterval(cookieInterval);
+    if (!authChecked) {
+      broadcast('tiktok-auth-cancelled');
+    }
+  });
+}
+
+ipcHandlers.registerIpcHandlers(tiktokService, twitchService, gameDetector, createTikTokAuthWindow);
 
 // ── App lifecycle ──
 app.whenReady().then(() => {
@@ -112,6 +211,9 @@ app.whenReady().then(() => {
 
   // ── LOCAL MEDIA DETECTION ──
   mediaDetector.start();
+
+  // ── MINECRAFT WORLD WATCHER ──
+  minecraftService.start();
 
   // Whitelist permissions: only allow media and display-capture (for audio visualizer)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {

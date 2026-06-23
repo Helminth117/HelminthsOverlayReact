@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const https = require('https');
 const { app } = require('electron');
 const fs = require('fs');
@@ -64,10 +64,9 @@ class GameDetector {
     }
 
     this.gameDetectRunning = true;
-    const cmd = process.platform === 'win32' ? 'tasklist /FO CSV /NH' : 'ps -e -o comm=';
 
     await new Promise(resolve => {
-      exec(cmd, { timeout: 5000 }, (err, stdout) => {
+      const callback = (err, stdout) => {
         this.gameDetectRunning = false;
         if (err) {
           console.error('[GameDetect] exec error:', err && err.message ? err.message : String(err));
@@ -117,7 +116,13 @@ class GameDetector {
           }
         }
         resolve();
-      });
+      };
+
+      if (process.platform === 'win32') {
+        execFile('tasklist.exe', ['/FO', 'CSV', '/NH'], { timeout: 5000 }, callback);
+      } else {
+        execFile('ps', ['-e', '-o', 'comm='], { timeout: 5000 }, callback);
+      }
     });
   }
 
@@ -267,7 +272,7 @@ class GameDetector {
 
   start() {
     if (this.gameDetectInterval) clearInterval(this.gameDetectInterval);
-    this.gameDetectInterval = setInterval(() => this.detectGame(), 10000);
+    this.gameDetectInterval = setInterval(() => this.detectGame(), 30000); // 30 seconds interval
     this.detectGame();
   }
 

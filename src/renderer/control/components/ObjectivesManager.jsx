@@ -6,7 +6,7 @@ function uid() {
   return 'x' + Date.now() + Math.random().toString(36).substr(2, 9);
 }
 
-export default function ObjectivesManager({
+const ObjectivesManager = React.memo(function ObjectivesManager({
   activeTab,
   session,
   setSession,
@@ -20,7 +20,6 @@ export default function ObjectivesManager({
   const [plantillaName, setPlantillaName] = useState('');
   const notesTimerRef = useRef(null);
 
-  if (activeTab !== 'objetivos') return null;
 
   return (
     <main className={`tab-view ${activeTab === 'objetivos' ? 'active' : ''}`}>
@@ -227,4 +226,6 @@ export default function ObjectivesManager({
       </div>
     </main>
   );
-}
+});
+
+export default ObjectivesManager;

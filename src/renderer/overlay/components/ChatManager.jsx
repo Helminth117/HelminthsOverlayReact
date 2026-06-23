@@ -6,20 +6,26 @@ import { speakText } from '../utils/speech';
 export default function ChatManager() {
   const [messages, setMessages] = useState([]);
   const [pinned, setPinned] = useState(null);
-  const config = useOverlayStore(s => s.config) || {};
+
+  const gameName = useOverlayStore(s => s.config?.gameName || 'Just Chatting');
+  const autoHideChatOnGame = useOverlayStore(s => s.config?.autoHideChatOnGame);
+  const glassWidgets = useOverlayStore(s => s.config?.glassWidgets);
 
   // Auto-visibility: show chat only on Just Chatting, hide when a game is running
-  const gameName = config.gameName || 'Just Chatting';
   const isJustChatting = gameName.trim().toLowerCase() === 'just chatting';
-  const chatVisible = config.autoHideChatOnGame !== false ? isJustChatting : true;
+  const chatVisible = autoHideChatOnGame !== false ? isJustChatting : true;
 
-  const configRef = useRef(config);
+  const configRef = useRef({});
   const userSongRequestsRef = useRef({});
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    configRef.current = config;
-  }, [config]);
+    configRef.current = useOverlayStore.getState().config || {};
+    const unsub = useOverlayStore.subscribe((state) => {
+      configRef.current = state.config || {};
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,14 +96,12 @@ export default function ChatManager() {
       if (data.text) {
         const textLower = data.text.trim().toLowerCase();
         const sbCommands = {
-          '!aplausos': './sounds/aplausos.mp3',
-          '!bonk': './sounds/bonk.mp3',
-          '!suspenso': './sounds/suspenso.mp3'
+          '!aplausos': 'aplausos',
+          '!bonk': 'bonk',
+          '!suspenso': 'suspenso'
         };
-        if (sbCommands[textLower]) {
-          const audio = new Audio(sbCommands[textLower]);
-          audio.volume = 0.5;
-          audio.play().catch(e => console.log('Audio command play error:', e));
+        if (sbCommands[textLower] && window.api?.playSoundboard) {
+          window.api.playSoundboard(sbCommands[textLower]);
         }
       }
 
@@ -145,7 +149,7 @@ export default function ChatManager() {
 
   return (
     <>
-      <DraggableWidget id="comp-chat" title="Chat de TikTok" isGlass={config.glassWidgets?.chat !== false} style={{ flexDirection: 'column' }}>
+      <DraggableWidget id="comp-chat" title="Chat de TikTok" isGlass={glassWidgets?.chat !== false} style={{ flexDirection: 'column' }}>
         <div className="chat-header">💬 CHAT EN VIVO</div>
         <div id="chat-messages" className="chat-messages">
           {messages.map(msg => {
@@ -182,7 +186,7 @@ export default function ChatManager() {
         </div>
       </DraggableWidget>
 
-      <DraggableWidget id="comp-pinned-chat" title="Mensaje Fijado" isGlass={config.glassWidgets?.['pinned-chat'] !== false} style={{ display: pinned ? 'flex' : 'none', width: '350px', flexDirection: 'column', borderColor: 'var(--accent)', borderWidth: '2px' }}>
+      <DraggableWidget id="comp-pinned-chat" title="Mensaje Fijado" isGlass={glassWidgets?.['pinned-chat'] !== false} style={{ display: pinned ? 'flex' : 'none', width: '350px', flexDirection: 'column', borderColor: 'var(--accent)', borderWidth: '2px' }}>
         <div className="chat-header" style={{ background: 'rgba(var(--accent-rgb), 0.2)', color: 'var(--accent)', paddingBottom: '5px' }}>📌 MENSAJE FIJADO</div>
         <div id="pinned-chat-content" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {pinned && (

@@ -496,52 +496,60 @@ export default function ChatAvatars() {
   const isMoving = useOverlayStore(s => s.isMoving);
   const config = useOverlayStore(s => s.config) || {};
 
-  // Store user database in localStorage
-  const userDatabaseRef = useRef({});
+  // High performance caching for platform bounding boxes to prevent layout thrashing
+  const platformsCacheRef = useRef({
+    platforms: [],
+    floorRect: { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 },
+    visRect: null
+  });
+  const tickCountRef = useRef(0);
 
-  // Initialize DB from localStorage
+  const rebuildPlatformsCache = () => {
+    const floorEl = document.getElementById('comp-chat-avatars');
+    if (!floorEl) return;
+    const floorRect = floorEl.getBoundingClientRect();
+    
+    const dragItems = document.querySelectorAll('.drag-item');
+    const platforms = [];
+    dragItems.forEach(el => {
+      if (el.id === 'comp-chat-avatars' || el.id === 'comp-visualizer' || el.classList.contains('hidden') || el.style.display === 'none') return;
+      const rect = el.getBoundingClientRect();
+      platforms.push({
+        id: el.id,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width
+      });
+    });
+
+    const visEl = document.getElementById('comp-visualizer');
+    let visRect = null;
+    if (visEl && !visEl.classList.contains('hidden') && visEl.style.display !== 'none') {
+      const rect = visEl.getBoundingClientRect();
+      visRect = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    }
+
+    platformsCacheRef.current = {
+      platforms,
+      floorRect: {
+        left: floorRect.left,
+        right: floorRect.right,
+        top: floorRect.top,
+        bottom: floorRect.bottom,
+        width: floorRect.width,
+        height: floorRect.height
+      },
+      visRect
+    };
+  };
+
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('tiktok_avatars_db');
-      if (stored) {
-        userDatabaseRef.current = JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Failed to load avatars DB:', e);
-    }
+    // Rebuild cache on window resize
+    window.addEventListener('resize', rebuildPlatformsCache);
+    return () => window.removeEventListener('resize', rebuildPlatformsCache);
   }, []);
-
-  const saveDatabase = () => {
-    try {
-      localStorage.setItem('tiktok_avatars_db', JSON.stringify(userDatabaseRef.current));
-    } catch (e) {
-      console.error('Failed to save avatars DB:', e);
-    }
-  };
-
-  const getUserData = (username) => {
-    const key = username.toLowerCase().trim();
-    if (!userDatabaseRef.current[key]) {
-      userDatabaseRef.current[key] = {
-        username: username,
-        points: 100,
-        likes: 0,
-        inventory: [],
-        equipped: []
-      };
-      saveDatabase();
-    }
-    return userDatabaseRef.current[key];
-  };
-
-  const updateUserData = (username, updater) => {
-    const key = username.toLowerCase().trim();
-    const currentData = getUserData(username);
-    const updated = { ...currentData, ...updater(currentData) };
-    userDatabaseRef.current[key] = updated;
-    saveDatabase();
-    return updated;
-  };
 
   // Tick frame animation cycle (blinking & waddling frames)
   useEffect(() => {
@@ -582,24 +590,19 @@ export default function ChatAvatars() {
     }, 1300);
   };
 
-  // Platform physics engine helper functions
-  const findPlatformUnderAvatar = (avX, y, prevY, floorRect) => {
-    const dragItems = document.querySelectorAll('.drag-item');
+  // Platform physics engine helper functions using pre-measured cache
+  const findPlatformUnderAvatar = (avX, y, prevY, platforms, floorRect) => {
     let highestPlatform = null;
     let highestTop = -1;
 
-    dragItems.forEach(el => {
-      // Ignore itself, visualizer (which is a trampoline), and hidden widgets
-      if (el.id === 'comp-chat-avatars' || el.id === 'comp-visualizer' || el.classList.contains('hidden') || el.style.display === 'none') return;
-      
-      const rect = el.getBoundingClientRect();
-      if (avX >= rect.left && avX <= rect.right) {
-        const platformTop = floorRect.bottom - rect.top;
+    platforms.forEach(p => {
+      if (avX >= p.left && avX <= p.right) {
+        const platformTop = floorRect.bottom - p.top;
         // Check if the feet cross the top boundary from above
         if (prevY >= platformTop - 1 && y <= platformTop + 4) {
           if (platformTop > highestTop) {
             highestTop = platformTop;
-            highestPlatform = { id: el.id, top: platformTop };
+            highestPlatform = { id: p.id, top: platformTop };
           }
         }
       }
@@ -608,57 +611,47 @@ export default function ChatAvatars() {
     return highestPlatform;
   };
 
-  const checkPlatformStillActive = (av, floorRect) => {
+  const checkPlatformStillActive = (av, platforms, floorRect) => {
     if (!av.platformId) return false;
-    const el = document.getElementById(av.platformId);
-    if (!el || el.classList.contains('hidden') || el.style.display === 'none') return false;
+    const p = platforms.find(x => x.id === av.platformId);
+    if (!p) return false;
 
-    const rect = el.getBoundingClientRect();
     const avX = floorRect.left + (av.x / 100) * floorRect.width;
 
     // Small boundary margin so they don't fall off on the exact pixel edge
     const padding = 10;
-    if (avX >= rect.left - padding && avX <= rect.right + padding) {
-      return floorRect.bottom - rect.top;
+    if (avX >= p.left - padding && avX <= p.right + padding) {
+      return floorRect.bottom - p.top;
     }
     return false;
   };
 
-  const getPlatformHorizontalBounds = (platformId, floorRect) => {
-    const el = document.getElementById(platformId);
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    const minX = ((rect.left - floorRect.left) / floorRect.width) * 100;
-    const maxX = ((rect.right - floorRect.left) / floorRect.width) * 100;
+  const getPlatformHorizontalBounds = (platformId, platforms, floorRect) => {
+    const p = platforms.find(x => x.id === platformId);
+    if (!p) return null;
+    const minX = ((p.left - floorRect.left) / floorRect.width) * 100;
+    const maxX = ((p.right - floorRect.left) / floorRect.width) * 100;
     return { minX: Math.max(2, minX), maxX: Math.min(98, maxX) };
   };
 
   // Helper to check and trigger headbutt jump if avatar walks under a widget
-  const checkWidgetCollisionAndHeadbutt = (av) => {
+  const checkWidgetCollisionAndHeadbutt = (av, platforms, floorRect) => {
     if (av.isDancing || av.action === 'jump' || av.action === 'fall') return null;
     if (Math.random() > 0.05) return null; // 5% chance per tick
 
-    const floorEl = document.getElementById('comp-chat-avatars');
-    if (!floorEl) return null;
-    const floorRect = floorEl.getBoundingClientRect();
-
     const avX = floorRect.left + (av.x / 100) * floorRect.width;
-    const dragItems = document.querySelectorAll('.drag-item');
     let closestWidget = null;
     let minDistanceY = Infinity;
 
-    dragItems.forEach(el => {
-      if (el.id === 'comp-chat-avatars' || el.id === 'comp-visualizer' || el.classList.contains('hidden') || el.style.display === 'none') return;
-      const rect = el.getBoundingClientRect();
-      
-      if (avX >= rect.left && avX <= rect.right) {
-        const widgetBottom = floorRect.bottom - rect.bottom;
+    platforms.forEach(p => {
+      if (avX >= p.left && avX <= p.right) {
+        const widgetBottom = floorRect.bottom - p.bottom;
         const avHeadY = av.y + 40; // top head height
         const distY = widgetBottom - avHeadY;
         
         // Target widgets above the head (up to 320px high)
         if (distY > 15 && distY < minDistanceY && distY < 320) {
-          closestWidget = { id: el.id, distY };
+          closestWidget = { id: p.id, distY };
           minDistanceY = distY;
         }
       }
@@ -683,11 +676,17 @@ export default function ChatAvatars() {
   // Sync avatar positions, actions, jumps, falls, platform walking and trampoline bounces
   useEffect(() => {
     const moveTimer = setInterval(() => {
+      // Rebuild the platform collision bounds cache every 10 ticks (500ms) to eliminate layout thrashing
+      tickCountRef.current = (tickCountRef.current + 1) % 10;
+      if (tickCountRef.current === 0 || platformsCacheRef.current.platforms.length === 0) {
+        rebuildPlatformsCache();
+      }
+
+      const { platforms, floorRect, visRect } = platformsCacheRef.current;
+      if (!floorRect.width) return; // Wait for first layout query to settle
+
       setAvatars(prev => {
         const now = Date.now();
-        const floorEl = document.getElementById('comp-chat-avatars');
-        if (!floorEl) return prev;
-        const floorRect = floorEl.getBoundingClientRect();
 
         return prev
           .map((av) => {
@@ -700,7 +699,7 @@ export default function ChatAvatars() {
 
             // --- 0. PLATFORM ADHESION SYNC ---
             if (platformId && action !== 'fall' && action !== 'jump') {
-              const platformTop = checkPlatformStillActive(av, floorRect);
+              const platformTop = checkPlatformStillActive(av, platforms, floorRect);
               if (platformTop !== false) {
                 y = platformTop;
                 vy = 0;
@@ -719,9 +718,7 @@ export default function ChatAvatars() {
               y += vy;
 
               // Check collision with the Visualizer (comp-visualizer) acting as a Trampoline
-              const visEl = document.getElementById('comp-visualizer');
-              if (visEl && !visEl.classList.contains('hidden') && visEl.style.display !== 'none') {
-                const visRect = visEl.getBoundingClientRect();
+              if (visRect) {
                 const avX = floorRect.left + (x / 100) * floorRect.width;
 
                 if (avX >= visRect.left && avX <= visRect.right) {
@@ -748,7 +745,7 @@ export default function ChatAvatars() {
               // Check landing on other platforms
               if (vy < 0) {
                 const avX = floorRect.left + (x / 100) * floorRect.width;
-                const platform = findPlatformUnderAvatar(avX, y, prevY, floorRect);
+                const platform = findPlatformUnderAvatar(avX, y, prevY, platforms, floorRect);
                 if (platform) {
                   y = platform.top;
                   vy = 0;
@@ -799,7 +796,7 @@ export default function ChatAvatars() {
               // Check platform landing on descent
               if (vy < 0) {
                 const avX = floorRect.left + (x / 100) * floorRect.width;
-                const platform = findPlatformUnderAvatar(avX, y, prevY, floorRect);
+                const platform = findPlatformUnderAvatar(avX, y, prevY, platforms, floorRect);
                 if (platform) {
                   y = platform.top;
                   vy = 0;
@@ -871,7 +868,7 @@ export default function ChatAvatars() {
               if (Math.random() < 0.25) {
                 action = 'idle';
                 if (platformId) {
-                  const bounds = getPlatformHorizontalBounds(platformId, floorRect);
+                  const bounds = getPlatformHorizontalBounds(platformId, platforms, floorRect);
                   if (bounds && Math.random() < 0.75) {
                     // Prefer staying on platform
                     targetX = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
@@ -884,7 +881,7 @@ export default function ChatAvatars() {
               } else {
                 action = 'walk';
                 if (platformId) {
-                  const bounds = getPlatformHorizontalBounds(platformId, floorRect);
+                  const bounds = getPlatformHorizontalBounds(platformId, platforms, floorRect);
                   if (bounds && Math.random() < 0.75) {
                     targetX = bounds.minX + Math.random() * (bounds.maxX - bounds.minX);
                   } else {
@@ -900,7 +897,7 @@ export default function ChatAvatars() {
               x += dist > 0 ? speed : -speed;
               
               // Occasional jump check
-              const jumpActionDetail = checkWidgetCollisionAndHeadbutt(av);
+              const jumpActionDetail = checkWidgetCollisionAndHeadbutt(av, platforms, floorRect);
               if (jumpActionDetail) {
                 return {
                   ...av,
@@ -930,76 +927,78 @@ export default function ChatAvatars() {
     if (!window.api) return;
 
     // Helper to trigger actions on user avatar
-    const triggerUserAvatar = (username, speechBubble = '', pointsBonus = 0, spawnFromSky = false, likesBonus = 0) => {
-      const dbUser = updateUserData(username, u => ({
-        points: u.points + pointsBonus,
-        likes: (u.likes || 0) + likesBonus
-      }));
+    const triggerUserAvatar = async (username, speechBubble = '', spawnFromSky = false) => {
+      try {
+        const dbUser = await window.api.getUserEconomy(username);
+        const equipped = dbUser?.equipped || [];
 
-      setAvatars(prev => {
-        const index = prev.findIndex(a => a.user.toLowerCase() === username.toLowerCase());
-        const now = Date.now();
-        const speechDetail = speechBubble ? {
-          message: speechBubble,
-          messageTime: now + 6000 // display speech bubble for 6 seconds
-        } : {};
+        setAvatars(prev => {
+          const index = prev.findIndex(a => a.user.toLowerCase() === username.toLowerCase());
+          const now = Date.now();
+          const speechDetail = speechBubble ? {
+            message: speechBubble,
+            messageTime: now + 6000 // display speech bubble for 6 seconds
+          } : {};
 
-        if (index >= 0) {
-          // Update existing avatar
-          const updated = [...prev];
-          
-          // If user is currently on the floor/platform, occasionally give them a jump
-          let extraAction = {};
-          if ((updated[index].y === 0 || updated[index].platformId) && updated[index].action !== 'jump' && Math.random() < 0.15) {
-            extraAction = {
-              action: 'jump',
-              vy: 7.5,
-              hasBumped: true // don't headbutt on random chat jumps
-            };
-          }
-
-          updated[index] = {
-            ...updated[index],
-            ...speechDetail,
-            ...extraAction,
-            equipped: dbUser.equipped,
-            lastActive: now
-          };
-          return updated;
-        } else {
-          // Spawn new avatar dropping from the sky!
-          let spawnY = 0;
-          if (spawnFromSky) {
-            const floorEl = document.getElementById('comp-chat-avatars');
-            const lineTopEl = document.getElementById('line-top');
-            if (floorEl && lineTopEl) {
-              const floorRect = floorEl.getBoundingClientRect();
-              const lineTopRect = lineTopEl.getBoundingClientRect();
-              spawnY = Math.max(150, floorRect.bottom - lineTopRect.top);
-            } else {
-              spawnY = window.innerHeight * 0.75;
+          if (index >= 0) {
+            // Update existing avatar
+            const updated = [...prev];
+            
+            // If user is currently on the floor/platform, occasionally give them a jump
+            let extraAction = {};
+            if ((updated[index].y === 0 || updated[index].platformId) && updated[index].action !== 'jump' && Math.random() < 0.15) {
+              extraAction = {
+                action: 'jump',
+                vy: 7.5,
+                hasBumped: true
+              };
             }
+
+            updated[index] = {
+              ...updated[index],
+              ...speechDetail,
+              ...extraAction,
+              equipped,
+              lastActive: now
+            };
+            return updated;
+          } else {
+            // Spawn new avatar dropping from the sky!
+            let spawnY = 0;
+            if (spawnFromSky) {
+              const floorEl = document.getElementById('comp-chat-avatars');
+              const lineTopEl = document.getElementById('line-top');
+              if (floorEl && lineTopEl) {
+                const floorRect = floorEl.getBoundingClientRect();
+                const lineTopRect = lineTopEl.getBoundingClientRect();
+                spawnY = Math.max(150, floorRect.bottom - lineTopRect.top);
+              } else {
+                spawnY = window.innerHeight * 0.75;
+              }
+            }
+            const newAvatar = {
+              user: username,
+              color: getUsernameColor(username),
+              x: 10 + Math.random() * 80,
+              y: spawnY,
+              vy: 0,
+              targetX: 10 + Math.random() * 80,
+              speed: 0.3 + Math.random() * 0.4,
+              direction: Math.random() > 0.5 ? 'right' : 'left',
+              action: spawnFromSky ? 'fall' : 'idle',
+              lastActive: now,
+              isDancing: false,
+              danceTimer: 0,
+              equipped,
+              platformId: undefined,
+              ...speechDetail
+            };
+            return [...prev, newAvatar];
           }
-          const newAvatar = {
-            user: username,
-            color: getUsernameColor(username),
-            x: 10 + Math.random() * 80,
-            y: spawnY,
-            vy: 0,
-            targetX: 10 + Math.random() * 80,
-            speed: 0.3 + Math.random() * 0.4,
-            direction: Math.random() > 0.5 ? 'right' : 'left',
-            action: spawnFromSky ? 'fall' : 'idle',
-            lastActive: now,
-            isDancing: false,
-            danceTimer: 0,
-            equipped: dbUser.equipped,
-            platformId: undefined,
-            ...speechDetail
-          };
-          return [...prev, newAvatar];
-        }
-      });
+        });
+      } catch (e) {
+        console.error('[ChatAvatars] Error fetching user economy:', e);
+      }
     };
 
     // Chat Event
@@ -1010,84 +1009,10 @@ export default function ChatAvatars() {
       const trimmedText = text.trim();
       const commandParts = trimmedText.split(' ');
       const command = commandParts[0].toLowerCase();
-      let responseMsg = '';
 
       if (command.startsWith('!')) {
         // --- PROCESS COMMANDS ---
-        if (command === '!puntos' || command === '!points') {
-          const dbUser = getUserData(user);
-          responseMsg = `Tengo ${dbUser.points} puntos y he enviado ${dbUser.likes || 0} likes! 💰❤️`;
-        } else if (command === '!likes') {
-          const dbUser = getUserData(user);
-          responseMsg = `He enviado ${dbUser.likes || 0} likes! ❤️`;
-        } else if (command === '!tienda' || command === '!shop') {
-          responseMsg = `Tienda: lentes (150), gorra (250), audifonos (300), mascara (400), escudo (500), halo (600), espada (850), alas (1200), corona (2000), aura (3500). Compra con !comprar <nombre>`;
-        } else if (command === '!comprar' || command === '!buy') {
-          let itemKey = commandParts[1]?.toLowerCase();
-          if (itemKey === 'audis' || itemKey === 'audifonos' || itemKey === 'auris') itemKey = 'auriculares';
-          if (itemKey === 'shield') itemKey = 'escudo';
-          const item = SHOP_ITEMS[itemKey];
-
-          if (!itemKey) {
-            responseMsg = `Especifica el accesorio, ej: !comprar gorra`;
-          } else if (!item) {
-            responseMsg = `Ese accesorio no existe en la tienda.`;
-          } else {
-            const dbUser = getUserData(user);
-            if (dbUser.inventory.includes(itemKey)) {
-              responseMsg = `Ya tienes ${item.name}! Equípalo con !equipar ${itemKey}`;
-            } else if (dbUser.points < item.cost) {
-              responseMsg = `Me faltan puntos para comprar ${item.name} (cuesta ${item.cost} pts, tengo ${dbUser.points})`;
-            } else {
-              // Deduct points, add to inventory and equip
-              updateUserData(user, u => ({
-                points: u.points - item.cost,
-                inventory: [...u.inventory, itemKey],
-                equipped: u.equipped.includes(itemKey) ? u.equipped : [...u.equipped, itemKey]
-              }));
-              responseMsg = `Comprado y equipado: ${item.name}! 🛍️`;
-            }
-          }
-        } else if (command === '!equipar' || command === '!equip') {
-          let itemKey = commandParts[1]?.toLowerCase();
-          if (itemKey === 'audis' || itemKey === 'audifonos' || itemKey === 'auris') itemKey = 'auriculares';
-          if (itemKey === 'shield') itemKey = 'escudo';
-
-          if (!itemKey) {
-            responseMsg = `Especifica el accesorio a equipar.`;
-          } else {
-            const dbUser = getUserData(user);
-            if (!dbUser.inventory.includes(itemKey)) {
-              responseMsg = `No tienes el accesorio ${itemKey}. Cómpralo con !comprar ${itemKey}`;
-            } else if (dbUser.equipped.includes(itemKey)) {
-              responseMsg = `Ya tienes equipado ${itemKey}.`;
-            } else {
-              updateUserData(user, u => ({
-                equipped: [...u.equipped, itemKey]
-              }));
-              responseMsg = `Equipado: ${itemKey}! ✨`;
-            }
-          }
-        } else if (command === '!desequipar' || command === '!unequip') {
-          let itemKey = commandParts[1]?.toLowerCase();
-          if (itemKey === 'audis' || itemKey === 'audifonos' || itemKey === 'auris') itemKey = 'auriculares';
-          if (itemKey === 'shield') itemKey = 'escudo';
-
-          if (!itemKey) {
-            responseMsg = `Especifica qué quitarte.`;
-          } else {
-            const dbUser = getUserData(user);
-            if (!dbUser.equipped.includes(itemKey)) {
-              responseMsg = `No tienes equipado ${itemKey}.`;
-            } else {
-              updateUserData(user, u => ({
-                equipped: u.equipped.filter(i => i !== itemKey)
-              }));
-              responseMsg = `Me quité: ${itemKey}.`;
-            }
-          }
-        } else if (command === '!bailar' || command === '!dance') {
-          responseMsg = `¡A bailar! 💃🕺`;
+        if (command === '!bailar' || command === '!dance') {
           // Trigger dance mode
           setAvatars(prev => {
             return prev.map(a => {
@@ -1101,27 +1026,19 @@ export default function ChatAvatars() {
               return a;
             });
           });
+          triggerUserAvatar(user, `¡A bailar! 💃🕺`, true);
         }
       } else {
         // Standard chat message
-        responseMsg = trimmedText;
+        triggerUserAvatar(user, trimmedText, true);
       }
-
-      // Spawn or update avatar and award active chat points (+15 points), drop from sky if spawning new
-      triggerUserAvatar(user, responseMsg, 15, true);
     };
 
     // Likes Event
     const handleLike = (data) => {
       const { user, count } = data || {};
       if (!user) return;
-      const pts = (count || 1) * 8;
-      
-      const dbUser = getUserData(user);
-      const newTotalLikes = (dbUser.likes || 0) + (count || 1);
-
-      // Spawn on floor (don't drop from sky for continuous simple likes)
-      triggerUserAvatar(user, `Envió ${count} Likes! ❤️`, pts, false, (count || 1));
+      triggerUserAvatar(user, `Envió ${count} Likes! ❤️`, false);
     };
 
     // Follow / Gift Alerts Event
@@ -1131,57 +1048,39 @@ export default function ChatAvatars() {
       if (!user) return;
 
       if (type === 'follow') {
-        // Award follow bonus points (+150 pts), drop from sky
-        triggerUserAvatar(user, `¡Seguí al streamer! 🎉`, 150, true);
+        triggerUserAvatar(user, `¡Seguí al streamer! 🎉`, true);
       } else if (type === 'gift') {
-        const coins = count || 1;
-        const totalBonus = coins * 100;
-        const cleanGift = gift.toLowerCase();
-        let autoUnlockMsg = '';
-
-        // Drop from sky on gift donations!
-        triggerUserAvatar(user, `¡Regaló ${gift} x${count}! 🎁`, totalBonus, true);
-
-        // Auto-equip special matching skins if they send particular gifts
-        if (cleanGift.includes('rose') || cleanGift.includes('rosa')) {
-          updateUserData(user, u => {
-            const inv = u.inventory.includes('halo') ? u.inventory : [...u.inventory, 'halo'];
-            const eq = u.equipped.includes('halo') ? u.equipped : [...u.equipped, 'halo'];
-            return { inventory: inv, equipped: eq };
-          });
-          autoUnlockMsg = `¡Desbloqueó el Halo de Ángel! 😇`;
-        } else if (cleanGift.includes('cap') || cleanGift.includes('gorra') || cleanGift.includes('sombrero')) {
-          updateUserData(user, u => {
-            const inv = u.inventory.includes('gorra') ? u.inventory : [...u.inventory, 'gorra'];
-            const eq = u.equipped.includes('gorra') ? u.equipped : [...u.equipped, 'gorra'];
-            return { inventory: inv, equipped: eq };
-          });
-          autoUnlockMsg = `¡Desbloqueó la Gorra Flama! 🧢`;
-        } else if (cleanGift.includes('crown') || cleanGift.includes('corona')) {
-          updateUserData(user, u => {
-            const inv = u.inventory.includes('corona') ? u.inventory : [...u.inventory, 'corona'];
-            const eq = u.equipped.includes('corona') ? u.equipped : [...u.equipped, 'corona'];
-            return { inventory: inv, equipped: eq };
-          });
-          autoUnlockMsg = `¡Desbloqueó la Corona Real! 👑`;
-        }
-
-        if (autoUnlockMsg) {
-          setTimeout(() => {
-            triggerUserAvatar(user, autoUnlockMsg, 0, false);
-          }, 3000);
-        }
+        triggerUserAvatar(user, `¡Regaló ${gift} x${count}! 🎁`, true);
       }
+    };
+
+    // Economy update listener to update avatar visual equipment in real time
+    const handleEconomyUpdate = (data) => {
+      const { username, equipped } = data || {};
+      if (!username) return;
+      setAvatars(prev => {
+        return prev.map(a => {
+          if (a.user.toLowerCase() === username.toLowerCase()) {
+            return {
+              ...a,
+              equipped: equipped || []
+            };
+          }
+          return a;
+        });
+      });
     };
 
     const chatUnsub = window.api.on('tiktok-chat', handleChat);
     const likeUnsub = window.api.on('tiktok-like', handleLike);
     const alertUnsub = window.api.on('stream-alert', handleStreamAlert);
+    const economyUnsub = window.api.on('economy-update', handleEconomyUpdate);
 
     return () => {
       window.api.off('tiktok-chat', chatUnsub);
       window.api.off('tiktok-like', likeUnsub);
       window.api.off('stream-alert', alertUnsub);
+      window.api.off('economy-update', economyUnsub);
     };
   }, []);
 
