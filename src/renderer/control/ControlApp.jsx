@@ -98,8 +98,7 @@ export default function ControlApp() {
   // Queue State
   const [queueData, setQueueData] = useState({ current: null, queue: [] });
 
-  // Chat State
-  const [chatHistory, setChatHistory] = useState([]);
+
 
   // Debounced Save Notes
   const notesTimerRef = useRef(null);
@@ -254,13 +253,7 @@ export default function ControlApp() {
       const queue = data?.queue || (Array.isArray(data) ? data : []);
       setQueueData({ current, queue });
     });
-    addListener('tiktok-chat', (data) => {
-      setChatHistory(prev => {
-        const next = [...prev, data];
-        if (next.length > 50) next.shift();
-        return next;
-      });
-    });
+
     addListener('auto-toggle-social', (id) => {
       setConfig(prev => {
         const soc = [...prev.social];
@@ -380,7 +373,6 @@ export default function ControlApp() {
           setPoll={setPoll}
           isPollActive={isPollActive}
           setIsPollActive={setIsPollActive}
-          chatHistory={chatHistory}
           queueData={queueData}
           initialSession={session}
           setSession={setSession}
